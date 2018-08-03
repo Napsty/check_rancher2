@@ -21,6 +21,7 @@
 # History:                                                                               #
 # 20180629 alpha Started programming of script                                           #
 # 20180713 beta1 Public release in repository                                            #
+# 20180803 beta2 Check for "type", echo project name in "all workload" check, too        #
 ##########################################################################################
 # todos: 
 # - check type: nodes (inside a given cluster) 
@@ -89,6 +90,7 @@ done
 if [ -z $apihost ]; then echo -e "CHECK_RANCHER2 UNKNOWN - Missing Rancher 2.x API host address"; exit ${STATE_UNKNOWN}; fi
 if [ -z $apiuser ]; then echo -e "CHECK_RANCHER2 UNKNOWN - Missing API user"; exit ${STATE_UNKNOWN}; fi
 if [ -z $apipass ]; then echo -e "CHECK_RANCHER2 UNKNOWN - Missing API password"; exit ${STATE_UNKNOWN}; fi
+if [ -z $type ]; then echo -e "CHECK_RANCHER2 UNKNOWN - Missing check type"; exit ${STATE_UNKNOWN}; fi
 #########################################################################
 # Base communication check
 apicheck=$(curl -s -o /dev/null -w "%{http_code}" -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project")
@@ -270,7 +272,6 @@ if [[ -z $workloadname ]]; then
 
 # Check status of all workloads within a project (project must be given)
   api_out_workloads=$(curl -s -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}/workloads")
-  #declare -a workload_ids=( $(echo "$api_out_workloads" | jshon -e data -a -e id) ) # Not needed
   declare -a workload_names=( $(echo "$api_out_workloads" | jshon -e data -a -e name) )
   declare -a healthstatus=( $(echo "$api_out_workloads" | jshon -e data -a -e state -u) )
   
@@ -291,7 +292,7 @@ if [[ -z $workloadname ]]; then
     echo "CHECK_RANCHER2 CRITICAL - ${workloaderrors[*]}|'workloads_total'=${#workload_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;;"
     exit ${STATE_CRITICAL}
   else
-    echo "CHECK_RANCHER2 OK - All workloads (${#workload_names[*]}) are healthy|'workloads_total'=${#workloads_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;;"
+    echo "CHECK_RANCHER2 OK - All workloads (${#workload_names[*]}) in project ${projectname} are healthy|'workloads_total'=${#workloads_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;;"
     exit ${STATE_OK}
   fi
 
