@@ -22,6 +22,7 @@
 # 20180629 alpha Started programming of script                                           #
 # 20180713 beta1 Public release in repository                                            #
 # 20180803 beta2 Check for "type", echo project name in "all workload" check, too        #
+# 20180806 beta3 Fix important bug in for loop in workload check, check for 'paused'     #
 ##########################################################################################
 # todos: 
 # - check type: nodes (inside a given cluster) 
@@ -274,14 +275,21 @@ if [[ -z $workloadname ]]; then
   api_out_workloads=$(curl -s -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}/workloads")
   declare -a workload_names=( $(echo "$api_out_workloads" | jshon -e data -a -e name) )
   declare -a healthstatus=( $(echo "$api_out_workloads" | jshon -e data -a -e state -u) )
-  
+  declare -a pausedstatus=( $(echo "$api_out_workloads" | jshon -e data -a -e paused -u) )
+ 
+  i=0 
   for workload in ${workload_names[*]}
   do
-    i=0
-    for status in ${healthstatus[*]}
+    for status in ${healthstatus[$i]}
     do 
       if [[ ${status} != active ]]; then 
         workloaderrors[$i]="Workload ${workload} is ${status} -"
+      fi
+    done
+    for paused in ${pausedstatus[$i]}
+    do 
+      if [[ ${paused} = true ]]; then 
+        workloadpaused[$i]="${workload} "
       fi
     done
     let i++
@@ -289,10 +297,13 @@ if [[ -z $workloadname ]]; then
 
   if [[ ${#workloaderrors[*]} -gt 0 ]]
   then 
-    echo "CHECK_RANCHER2 CRITICAL - ${workloaderrors[*]}|'workloads_total'=${#workload_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;;"
+    echo "CHECK_RANCHER2 CRITICAL - ${workloaderrors[*]}|'workloads_total'=${#workload_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;; 'workloads_paused'=${#workloadpaused[*]};;;;"
     exit ${STATE_CRITICAL}
   else
-    echo "CHECK_RANCHER2 OK - All workloads (${#workload_names[*]}) in project ${projectname} are healthy|'workloads_total'=${#workloads_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;;"
+    if [[ ${#workloadpaused[*]} -gt 0 ]]
+      then echo "CHECK_RANCHER2 OK - All workloads (${#workload_names[*]}) in project ${projectname} are healthy/active ( Note: ${#workloadpaused[*]} workloads currently paused: ${workloadpaused[*]})|'workloads_total'=${#workload_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;; 'workloads_paused'=${#workloadpaused[*]};;;;"
+      else echo "CHECK_RANCHER2 OK - All workloads (${#workload_names[*]}) in project ${projectname} are healthy/active|'workloads_total'=${#workloads_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;; 'workloads_paused'=${#workloadpaused[*]};;;;"
+    fi
     exit ${STATE_OK}
   fi
 
