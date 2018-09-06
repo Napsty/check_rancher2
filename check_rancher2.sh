@@ -23,6 +23,7 @@
 # 20180713 beta1 Public release in repository                                            #
 # 20180803 beta2 Check for "type", echo project name in "all workload" check, too        #
 # 20180806 beta3 Fix important bug in for loop in workload check, check for 'paused'     #
+# 20180906 beta4 Catch cluster not found and zero workloads in workload check            #
 ##########################################################################################
 # todos: 
 # - check type: nodes (inside a given cluster) 
@@ -103,6 +104,8 @@ elif [[ $apicheck = 302 ]]
 then echo -e "CHECK_RANCHER2 UNKNOWN - Redirect detected. Maybe http to https? Use -S parameter."; exit ${STATE_UNKNOWN}
 elif [[ $apicheck = 401 ]]
 then echo -e "CHECK_RANCHER2 WARNING - Authentication failed"; exit ${STATE_WARNING}
+elif [[ $apicheck -gt 499 ]]
+then echo -e "CHECK_RANCHER2 CRITICAL - API Returned HTTP $apicheck error"; exit ${STATE_CRITICAL}
 fi
 #########################################################################
 # Do the checks
@@ -265,7 +268,7 @@ fi
 ;;
 
 # --- workload status check (requires project)--- #
-service) echo -e "CHECK_RANCHER2 UNKNOWN - Rancher 2 calls services workloads. Use -t workload."; exit ${STATE_UNKNOWN}
+service) echo -e "CHECK_RANCHER2 UNKNOWN - In Rancher 2 services are called workloads. Use -t workload."; exit ${STATE_UNKNOWN}
 ;;
 workload)
 if [ -z $projectname ]; then echo -e "CHECK_RANCHER2 UNKNOWN - To check workloads you must also define the project (-p). This will check all workloads within the given project. To check a specific workload, define it with -w."; exit ${STATE_UNKNOWN}; fi
@@ -273,9 +276,20 @@ if [[ -z $workloadname ]]; then
 
 # Check status of all workloads within a project (project must be given)
   api_out_workloads=$(curl -s -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}/workloads")
+
+  if [[ -n $(echo "$api_out_workloads" | grep -i "ClusterUnavailable") ]]; then 
+    clustername=$(echo ${projectname} | awk -F':' '{print $1}')
+    echo "CHECK_RANCHER2 CRITICAL - Cluster $clustername not found. Hint: Use '-t info' to identify cluster and project names."; exit ${STATE_CRITICAL}
+  fi
+
   declare -a workload_names=( $(echo "$api_out_workloads" | jshon -e data -a -e name) )
   declare -a healthstatus=( $(echo "$api_out_workloads" | jshon -e data -a -e state -u) )
   declare -a pausedstatus=( $(echo "$api_out_workloads" | jshon -e data -a -e paused -u) )
+
+  # We rather WARN than silently return OK for zero workloads
+  if [[ ${#workload_names} -eq 0 ]]; then 
+    echo "CHECK_RANCHER2 WARNING - No workloads found in project ${projectname}."; exit ${STATE_WARNING}
+  fi
  
   i=0 
   for workload in ${workload_names[*]}
@@ -311,6 +325,11 @@ else
  
 # Check status of a single workload
   api_out_single_workload=$(curl -s -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}/workloads/?name=${workloadname}")
+
+  if [[ -n $(echo "$api_out_single_workload" | grep -i "ClusterUnavailable") ]]; then 
+    clustername=$(echo ${projectname} | awk -F':' '{print $1}')
+    echo "CHECK_RANCHER2 CRITICAL - Cluster $clustername not found. Hint: Use '-t info' to identify cluster and project names."; exit ${STATE_CRITICAL}
+  fi
 
   # Check if that given project name exists
   if [[ -z $(echo "$api_out_single_workload" | grep -i "containers") ]]
