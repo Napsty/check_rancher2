@@ -24,6 +24,7 @@
 # 20180803 beta2 Check for "type", echo project name in "all workload" check, too        #
 # 20180806 beta3 Fix important bug in for loop in workload check, check for 'paused'     #
 # 20180906 beta4 Catch cluster not found and zero workloads in workload check            #
+# 20180906 beta5 Fix paused check (type 'object' has no elements to extract (arg 5)      #
 ##########################################################################################
 # todos: 
 # - check type: nodes (inside a given cluster) 
@@ -284,7 +285,7 @@ if [[ -z $workloadname ]]; then
 
   declare -a workload_names=( $(echo "$api_out_workloads" | jshon -e data -a -e name) )
   declare -a healthstatus=( $(echo "$api_out_workloads" | jshon -e data -a -e state -u) )
-  declare -a pausedstatus=( $(echo "$api_out_workloads" | jshon -e data -a -e paused -u) )
+  declare -a pausedstatus=( $(echo "$api_out_workloads" | jshon -e data -a -s paused -u) )
 
   # We rather WARN than silently return OK for zero workloads
   if [[ ${#workload_names} -eq 0 ]]; then 
