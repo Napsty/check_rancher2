@@ -4,9 +4,10 @@
 # Author:        Claudio Kuenzler                                                        #
 # Official repo: https://github.com/Napsty/check_rancher2                                #
 # Documentation: https://www.claudiokuenzler.com/monitoring-plugins/check_rancher2.php   #
-# Purpose:       Monitor Rancher 2.x container envioronments                             #
-# Description:   Checks status of resources within the Kubernetes environment(s)         #
-#                using the Rancher 2.x API                                               #
+# Purpose:       Monitor Rancher 2.x Kubernetes cluster and their containers             #
+# Description:   Checks status of resources within the Kubernetes cluster(s) using       #
+#                Rancher 2.x API                                                         #
+#                                                                                        #
 # License :      GNU General Public Licence (GPL) http://www.gnu.org/                    #
 # This program is free software; you can redistribute it and/or modify it under the      #
 # terms of the GNU General Public License as published by the Free Software Foundation;  #
@@ -25,6 +26,7 @@
 # 20180806 beta3 Fix important bug in for loop in workload check, check for 'paused'     #
 # 20180906 beta4 Catch cluster not found and zero workloads in workload check            #
 # 20180906 beta5 Fix paused check (type 'object' has no elements to extract (arg 5)      #
+# 20180921 beta6 Added pod(s) check within a project                                     #
 ##########################################################################################
 # todos: 
 # - check type: nodes (inside a given cluster) 
@@ -37,6 +39,7 @@ STATE_CRITICAL=2        # define the exit code if status is Critical
 STATE_UNKNOWN=3         # define the exit code if status is Unknown
 export PATH=/usr/local/bin:/usr/bin:/bin:$PATH # Set path
 proto=http		# Protocol to use, default is http, can be overwritten with -S parameter
+version=beta6
 
 # Check for necessary commands
 for cmd in jshon curl [
@@ -49,7 +52,7 @@ do
 done
 #########################################################################
 # We all need help from time to time
-help="check_rancher2 (c) 2018 Claudio Kuenzler (published under GPLv2)\n
+help="check_rancher2 v ${version} (c) 2018 Claudio Kuenzler (published under GPLv2)\n
 Usage: $0 -H Rancher2Address -U user-token -P password [-S] -t checktype [-c cluster] [-p project] [-w workload]\n
 \nOptions:\n
 \t-H Address of Rancher 2 API (e.g. rancher.example.com)\n
@@ -59,7 +62,9 @@ Usage: $0 -H Rancher2Address -U user-token -P password [-S] -t checktype [-c clu
 \t-t Check type (see list below for available check types)\n
 \t-c Cluster name (for specific cluster check)\n
 \t-p Project name (for specific project check, needed for workload checks)\n
+\t-n Namespace name (needed for specific pod checks)\n
 \t-w Workload name (for specific workload check)\n
+\t-o Pod name (for specific pod check, this makes only sense if you use static pods)\n
 \t-h Help. I need somebody. Help. Not just anybody. Heeeeeelp!\n
 \nCheck Types:\n
 \tinfo -> Informs about available clusters and projects and their API ID's. These ID's are needed for specific checks.\n
@@ -73,7 +78,7 @@ if [ "${1}" = "--help" -o "${#}" = "0" ];
 fi
 #########################################################################
 # Get user-given variables
-while getopts "H:U:P:t:c:p:w:Sh" Input;
+while getopts "H:U:P:t:c:p:n:w:o:Sh" Input;
 do
   case ${Input} in
   H)      apihost=${OPTARG};;
@@ -82,7 +87,9 @@ do
   t)      type=${OPTARG};;
   c)      clustername=${OPTARG};;
   p)      projectname=${OPTARG};;
+  n)      namespacename=${OPTARG};;
   w)      workloadname=${OPTARG};;
+  o)      podname=${OPTARG};;
   S)      proto=https;;
   h)      echo -e ${help}; exit ${STATE_UNKNOWN};;
   *)      echo -e ${help}; exit ${STATE_UNKNOWN};;
@@ -348,6 +355,77 @@ else
     exit ${STATE_OK}
   fi
   
+fi
+;;
+
+# --- pod status check (requires project) --- #
+pod)
+if [ -z $projectname ]; then echo -e "CHECK_RANCHER2 UNKNOWN - To check pods you must also define the project (-p). This will check all pods within the given project. To check a specific pod, define it with -o podname and -n namespace."; exit ${STATE_UNKNOWN}; fi
+if [[ -z $podname ]]; then 
+
+# Check status of all pods within a project (project must be given)
+  api_out_pods=$(curl -s -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}/pods")
+
+  if [[ -n $(echo "$api_out_pods" | grep -i "ClusterUnavailable") ]]; then
+    clustername=$(echo ${projectname} | awk -F':' '{print $1}')
+    echo "CHECK_RANCHER2 CRITICAL - Cluster $clustername not found. Hint: Use '-t info' to identify cluster and project names."; exit ${STATE_CRITICAL}
+  fi
+
+  declare -a pod_names=( $(echo "$api_out_pods" | jshon -e data -a -e name) )
+  declare -a healthstatus=( $(echo "$api_out_pods" | jshon -e data -a -e state -u) )
+
+  # We rather WARN than silently return OK for zero pods
+  if [[ ${#pod_names} -eq 0 ]]; then
+    echo "CHECK_RANCHER2 WARNING - No pods found in project ${projectname}."; exit ${STATE_WARNING}
+  fi
+
+  i=0
+  for pod in ${pod_names[*]}
+  do
+    for status in ${healthstatus[$i]}
+    do
+      if [[ ${status} != running ]]; then
+        poderrors[$i]="Pod ${pod} is ${status} -"
+      fi
+    done
+    let i++
+  done
+
+  if [[ ${#poderrors[*]} -gt 0 ]]
+  then
+    echo "CHECK_RANCHER2 CRITICAL - ${poderrors[*]}|'pods_total'=${#pod_names[*]};;;; 'pods_errors'=${#poderrors[*]};;;;"
+    exit ${STATE_CRITICAL}
+  else
+    echo "CHECK_RANCHER2 OK - All pods (${#pod_names[*]}) in project ${projectname} are running|'pods_total'=${#pod_names[*]};;;; 'pod_errors'=${#poderrors[*]};;;;"
+    exit ${STATE_OK}
+  fi
+
+else
+# Check status of a single pod (requires project and namespace)
+# Note: This only makes sense when you create static pods!
+  if [ -z $namespacename ]; then echo -e "CHECK_RANCHER2 UNKNOWN - To check a single pod you must also define the namespace (-n)."; exit ${STATE_UNKNOWN}; fi
+  api_out_single_pod=$(curl -s -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}/pods/${namespacename}:${podname}")
+
+  if [[ -n $(echo "$api_out_single_pod" | grep -i "ClusterUnavailable") ]]; then
+    clustername=$(echo ${projectname} | awk -F':' '{print $1}')
+    echo "CHECK_RANCHER2 CRITICAL - Cluster $clustername not found. Hint: Use '-t info' to identify cluster and project names."; exit ${STATE_CRITICAL}
+  fi
+
+  # Check if that given project name exists
+  if [[ -z $(echo "$api_out_single_pod" | grep -i "containers") ]]
+    then echo "CHECK_RANCHER2 CRITICAL - Pod $podname not found. Verify project (-p) and pod (-o) names."; exit ${STATE_CRITICAL}
+  fi
+
+  healthstatus=$(echo "$api_out_single_pod" | jshon -e state -u)
+
+  if [[ ${healthstatus} != running ]]
+  then
+    echo "CHECK_RANCHER2 CRITICAL - Pod $podname is ${healthstatus}|'pod_active'=0;;;; 'pod_error'=1;;;;"
+    exit ${STATE_CRITICAL}
+  else
+    echo "CHECK_RANCHER2 OK - Pod $podname is running|'pod_active'=1;;;; 'pod_error'=0;;;;"
+    exit ${STATE_OK}
+  fi
 
 fi
 ;;
