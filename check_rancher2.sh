@@ -396,7 +396,7 @@ if [[ -z $podname ]]; then
     echo "CHECK_RANCHER2 CRITICAL - ${poderrors[*]}|'pods_total'=${#pod_names[*]};;;; 'pods_errors'=${#poderrors[*]};;;;"
     exit ${STATE_CRITICAL}
   else
-    echo "CHECK_RANCHER2 OK - All pods (${#pod_names[*]}) in project ${projectname} are running|'pods_total'=${#pod_names[*]};;;; 'pod_errors'=${#poderrors[*]};;;;"
+    echo "CHECK_RANCHER2 OK - All pods (${#pod_names[*]}) in project ${projectname} are running|'pods_total'=${#pod_names[*]};;;; 'pods_errors'=${#poderrors[*]};;;;"
     exit ${STATE_OK}
   fi
 
