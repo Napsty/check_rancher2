@@ -27,6 +27,7 @@
 # 20180906 beta4 Catch cluster not found and zero workloads in workload check            #
 # 20180906 beta5 Fix paused check (type 'object' has no elements to extract (arg 5)      #
 # 20180921 beta6 Added pod(s) check within a project                                     #
+# 20180926 beta7 Handle a workflow in status 'updating' as warning, not critical         #
 ##########################################################################################
 # todos: 
 # - check type: nodes (inside a given cluster) 
@@ -39,7 +40,7 @@ STATE_CRITICAL=2        # define the exit code if status is Critical
 STATE_UNKNOWN=3         # define the exit code if status is Unknown
 export PATH=/usr/local/bin:/usr/bin:/bin:$PATH # Set path
 proto=http		# Protocol to use, default is http, can be overwritten with -S parameter
-version=beta6
+version=beta7
 
 # Check for necessary commands
 for cmd in jshon curl [
@@ -304,7 +305,9 @@ if [[ -z $workloadname ]]; then
   do
     for status in ${healthstatus[$i]}
     do 
-      if [[ ${status} != active ]]; then 
+      if [[ ${status} = updating ]]; then 
+        workloadwarnings[$i]="Workload ${workload} is ${status} -"
+      elif [[ ${status} != active ]]; then
         workloaderrors[$i]="Workload ${workload} is ${status} -"
       fi
     done
@@ -319,12 +322,16 @@ if [[ -z $workloadname ]]; then
 
   if [[ ${#workloaderrors[*]} -gt 0 ]]
   then 
-    echo "CHECK_RANCHER2 CRITICAL - ${workloaderrors[*]}|'workloads_total'=${#workload_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;; 'workloads_paused'=${#workloadpaused[*]};;;;"
+    echo "CHECK_RANCHER2 CRITICAL - ${workloaderrors[*]}|'workloads_total'=${#workload_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;; 'workloads_warnings'=${#workloadwarnings[*]};;;; 'workloads_paused'=${#workloadpaused[*]};;;;"
     exit ${STATE_CRITICAL}
+  elif [[ ${#workloadwarnings[*]} -gt 0 ]]
+  then 
+    echo "CHECK_RANCHER2 WARNING - ${workloadwarnings[*]}|'workloads_total'=${#workload_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;; 'workloads_warnings'=${#workloadwarnings[*]};;;; 'workloads_paused'=${#workloadpaused[*]};;;;"
+    exit ${STATE_WARNING}
   else
     if [[ ${#workloadpaused[*]} -gt 0 ]]
-      then echo "CHECK_RANCHER2 OK - All workloads (${#workload_names[*]}) in project ${projectname} are healthy/active ( Note: ${#workloadpaused[*]} workloads currently paused: ${workloadpaused[*]})|'workloads_total'=${#workload_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;; 'workloads_paused'=${#workloadpaused[*]};;;;"
-      else echo "CHECK_RANCHER2 OK - All workloads (${#workload_names[*]}) in project ${projectname} are healthy/active|'workloads_total'=${#workloads_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;; 'workloads_paused'=${#workloadpaused[*]};;;;"
+      then echo "CHECK_RANCHER2 OK - All workloads (${#workload_names[*]}) in project ${projectname} are healthy/active ( Note: ${#workloadpaused[*]} workloads currently paused: ${workloadpaused[*]})|'workloads_total'=${#workload_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;; 'workloads_warnings'=${#workloadwarnings[*]};;;; 'workloads_paused'=${#workloadpaused[*]};;;;"
+      else echo "CHECK_RANCHER2 OK - All workloads (${#workload_names[*]}) in project ${projectname} are healthy/active|'workloads_total'=${#workloads_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;; 'workloads_warnings'=${#workloadwarnings[*]};;;; 'workloads_paused'=${#workloadpaused[*]};;;;"
     fi
     exit ${STATE_OK}
   fi
@@ -346,12 +353,16 @@ else
 
   healthstatus=$(echo "$api_out_single_workload" | jshon -e data -a -e state -u)
   
-  if [[ ${healthstatus} != active ]]
+  if [[ ${healthstatus} = updating ]]
+  then 
+    echo "CHECK_RANCHER2 WARNING - Workload $workloadname is ${healthstatus}|'workload_active'=0;;;; 'workload_error'=0;;;; 'workload_warning'=1;;;;"
+    exit ${STATE_WARNING}
+  elif [[ ${healthstatus} != active ]]
   then
-    echo "CHECK_RANCHER2 CRITICAL - Workload $workloadname is ${healthstatus}|'workload_active'=0;;;; 'workload_error'=1;;;;"
+    echo "CHECK_RANCHER2 CRITICAL - Workload $workloadname is ${healthstatus}|'workload_active'=0;;;; 'workload_error'=1;;;; 'workload_warning'=0;;;;"
     exit ${STATE_CRITICAL}
   else
-    echo "CHECK_RANCHER2 OK - Workload $workloadname is active|'workload_active'=1;;;; 'workload_error'=0;;;;"
+    echo "CHECK_RANCHER2 OK - Workload $workloadname is active|'workload_active'=1;;;; 'workload_error'=0;;;; 'workload_warning'=0;;;;"
     exit ${STATE_OK}
   fi
   
