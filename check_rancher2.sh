@@ -28,10 +28,10 @@
 # 20180906 beta5 Fix paused check (type 'object' has no elements to extract (arg 5)      #
 # 20180921 beta6 Added pod(s) check within a project                                     #
 # 20180926 beta7 Handle a workflow in status 'updating' as warning, not critical         #
+# 20181107 beta8 Missing pod check type in help, documentation completed                 #
 ##########################################################################################
 # todos: 
 # - check type: nodes (inside a given cluster) 
-# - documentation
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
@@ -72,6 +72,7 @@ Usage: $0 -H Rancher2Address -U user-token -P password [-S] -t checktype [-c clu
 \tcluster -> Checks the current status of all clusters or of a specific cluster (defined with -c clusterid)\n
 \tproject -> Checks the current status of all projects or of a specific project (defined with -p projectid)\n
 \tworkload -> Checks the current status of all or a specific (-w workloadname) workload within a project (-p projectid must be set!)\n
+\tpod -> Checks the current status of all or a specific (-o podname -n namespace) pod within a project (-p projectid must be set!)\n
 \n"
 
 if [ "${1}" = "--help" -o "${#}" = "0" ];
