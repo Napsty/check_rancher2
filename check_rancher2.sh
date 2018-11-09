@@ -29,6 +29,7 @@
 # 20180921 beta6 Added pod(s) check within a project                                     #
 # 20180926 beta7 Handle a workflow in status 'updating' as warning, not critical         #
 # 20181107 beta8 Missing pod check type in help, documentation completed                 #
+# 20181109 1.0.0 Do not alert for succeeded pods                                         #
 ##########################################################################################
 # todos: 
 # - check type: nodes (inside a given cluster) 
@@ -40,7 +41,7 @@ STATE_CRITICAL=2        # define the exit code if status is Critical
 STATE_UNKNOWN=3         # define the exit code if status is Unknown
 export PATH=/usr/local/bin:/usr/bin:/bin:$PATH # Set path
 proto=http		# Protocol to use, default is http, can be overwritten with -S parameter
-version=beta7
+version=1.0.0
 
 # Check for necessary commands
 for cmd in jshon curl [
@@ -396,7 +397,7 @@ if [[ -z $podname ]]; then
   do
     for status in ${healthstatus[$i]}
     do
-      if [[ ${status} != running ]]; then
+      if [[ ${status} != running && ${status} != succeeded ]]; then
         poderrors[$i]="Pod ${pod} is ${status} -"
       fi
     done
