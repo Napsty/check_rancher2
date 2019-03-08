@@ -30,9 +30,7 @@
 # 20180926 beta7 Handle a workflow in status 'updating' as warning, not critical         #
 # 20181107 beta8 Missing pod check type in help, documentation completed                 #
 # 20181109 1.0.0 Do not alert for succeeded pods                                         #
-##########################################################################################
-# todos: 
-# - check type: nodes (inside a given cluster) 
+# 20190308 1.1.0 Added node(s) check                                                     #
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
@@ -41,7 +39,7 @@ STATE_CRITICAL=2        # define the exit code if status is Critical
 STATE_UNKNOWN=3         # define the exit code if status is Unknown
 export PATH=/usr/local/bin:/usr/bin:/bin:$PATH # Set path
 proto=http		# Protocol to use, default is http, can be overwritten with -S parameter
-version=1.0.0
+version=1.1.0
 
 # Check for necessary commands
 for cmd in jshon curl [
@@ -54,7 +52,7 @@ do
 done
 #########################################################################
 # We all need help from time to time
-help="check_rancher2 v ${version} (c) 2018 Claudio Kuenzler (published under GPLv2)\n
+help="check_rancher2 v ${version} (c) 2018-2019 Claudio Kuenzler (published under GPLv2)\n
 Usage: $0 -H Rancher2Address -U user-token -P password [-S] -t checktype [-c cluster] [-p project] [-w workload]\n
 \nOptions:\n
 \t-H Address of Rancher 2 API (e.g. rancher.example.com)\n
@@ -71,6 +69,7 @@ Usage: $0 -H Rancher2Address -U user-token -P password [-S] -t checktype [-c clu
 \nCheck Types:\n
 \tinfo -> Informs about available clusters and projects and their API ID's. These ID's are needed for specific checks.\n
 \tcluster -> Checks the current status of all clusters or of a specific cluster (defined with -c clusterid)\n
+\tnode -> Checks the current status of all nodes or of nodes in a specific cluster (defined with -c clusterid)\n
 \tproject -> Checks the current status of all projects or of a specific project (defined with -p projectid)\n
 \tworkload -> Checks the current status of all or a specific (-w workloadname) workload within a project (-p projectid must be set!)\n
 \tpod -> Checks the current status of all or a specific (-o podname -n namespace) pod within a project (-p projectid must be set!)\n
@@ -220,6 +219,75 @@ else
 
 fi
 ;;
+
+# --- node status check --- #
+node)
+if [[ -z $clustername ]]; then 
+
+# Check status of all nodes in all clusters
+  api_out_nodes=$(curl -s -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/nodes")
+  declare -a node_names=( $(echo "$api_out_nodes" | jshon -e data -a -e nodeName -u) )
+  declare -a node_status=( $(echo "$api_out_nodes" | jshon -e data -a -e state -u) )
+  declare -a node_cluster_member=( $(echo "$api_out_nodes" | jshon -e data -a -e clusterId -u) )
+
+  i=0
+  for node in ${node_names[*]}
+  do
+    for status in ${node_status[$i]}
+    do 
+      if [[ ${status} != active ]]; then 
+        nodeerrors[$i]="${node} in cluster ${node_cluster_member[$i]} is ${node_status[$i]} -"
+      fi
+    done
+  let i++
+  done
+
+  if [[ ${#nodeerrors[*]} -gt 0 ]]
+  then 
+    echo "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;;"
+    exit ${STATE_CRITICAL}
+  else
+    echo "CHECK_RANCHER2 OK - All ${#node_names[*]} nodes are active|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;;"
+    exit ${STATE_OK}
+  fi
+
+else 
+
+# Check status of all nodes in a specific clusters
+  api_out_nodes=$(curl -s -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/nodes/?clusterId=${clustername}")
+
+  # Check if that given cluster name exists
+  if [[ -n $(echo "$api_out_nodes" | grep -i "error") ]]
+    then echo "CHECK_RANCHER2 CRITICAL - Cluster $clustername not found. Hint: Use '-t info' to identify cluster and project names."; exit ${STATE_CRITICAL}
+  fi
+
+  declare -a node_names=( $(echo "$api_out_nodes" | jshon -e data -a -e nodeName -u) )
+  declare -a node_status=( $(echo "$api_out_nodes" | jshon -e data -a -e state -u) )
+
+  i=0
+  for node in ${node_names[*]}
+  do
+    for status in ${node_status[$i]}
+    do 
+      if [[ ${status} != active ]]; then 
+        nodeerrors[$i]="${node} in cluster ${clustername} is ${node_status[$i]} -"
+      fi
+    done
+  let i++
+  done
+
+  if [[ ${#nodeerrors[*]} -gt 0 ]]
+  then 
+    echo "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;;"
+    exit ${STATE_CRITICAL}
+  else
+    echo "CHECK_RANCHER2 OK - All ${#node_names[*]} nodes are active|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;;"
+    exit ${STATE_OK}
+  fi
+
+fi
+;;
+
 
 # --- project status check --- #
 project)
