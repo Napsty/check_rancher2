@@ -32,6 +32,7 @@
 # 20181109 1.0.0 Do not alert for succeeded pods                                         #
 # 20190308 1.1.0 Added node(s) check                                                     #
 # 20190903 1.1.1 Detect invalid hostname (non-API hostname)                              #
+# 20190903 1.2.0 Allow self-signed certificates (-s)                                     #
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
@@ -40,7 +41,7 @@ STATE_CRITICAL=2        # define the exit code if status is Critical
 STATE_UNKNOWN=3         # define the exit code if status is Unknown
 export PATH=/usr/local/bin:/usr/bin:/bin:$PATH # Set path
 proto=http		# Protocol to use, default is http, can be overwritten with -S parameter
-version=1.1.1
+version=1.2.0
 
 # Check for necessary commands
 for cmd in jshon curl [
@@ -60,6 +61,7 @@ Usage: $0 -H Rancher2Address -U user-token -P password [-S] -t checktype [-c clu
 \t-U API username (Access Key)\n
 \t-P API password (Secret Key)\n
 \t-S Use https instead of http\n
+\t-s Allow self-signed certificates\n
 \t-t Check type (see list below for available check types)\n
 \t-c Cluster name (for specific cluster check)\n
 \t-p Project name (for specific project check, needed for workload checks)\n
@@ -81,7 +83,7 @@ if [ "${1}" = "--help" -o "${#}" = "0" ];
 fi
 #########################################################################
 # Get user-given variables
-while getopts "H:U:P:t:c:p:n:w:o:Sh" Input;
+while getopts "H:U:P:t:c:p:n:w:o:Ssh" Input;
 do
   case ${Input} in
   H)      apihost=${OPTARG};;
@@ -94,6 +96,7 @@ do
   w)      workloadname=${OPTARG};;
   o)      podname=${OPTARG};;
   S)      proto=https;;
+  s)      selfsigned="-k";;
   h)      echo -e ${help}; exit ${STATE_UNKNOWN};;
   *)      echo -e ${help}; exit ${STATE_UNKNOWN};;
   esac
@@ -106,7 +109,7 @@ if [ -z $apipass ]; then echo -e "CHECK_RANCHER2 UNKNOWN - Missing API password"
 if [ -z $type ]; then echo -e "CHECK_RANCHER2 UNKNOWN - Missing check type"; exit ${STATE_UNKNOWN}; fi
 #########################################################################
 # Base communication check
-apicheck=$(curl -s -o /dev/null -w "%{http_code}" -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project")
+apicheck=$(curl -s ${selfsigned} -o /dev/null -w "%{http_code}" -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project")
 
 # Detect failures
 if [[ $apicheck = 000 ]]
@@ -126,8 +129,8 @@ case ${type} in
 
 # --- info --- #
 info)
-api_out_clusters=$(curl -s -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/clusters")
-api_out_project=$(curl -s -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project")
+api_out_clusters=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/clusters")
+api_out_project=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project")
 declare -a cluster_ids=( $(echo "$api_out_clusters" | jshon -e data -a -e id) )
 declare -a cluster_names=( $(echo "$api_out_clusters" | jshon -e data -a -e name) )
 declare -a project_ids=( $(echo "$api_out_project" | jshon -e data -a -e id) )
@@ -162,7 +165,7 @@ cluster)
 if [[ -z $clustername ]]; then 
 
 # Check status of all clusters
-  api_out_clusters=$(curl -s -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/clusters")
+  api_out_clusters=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/clusters")
   declare -a cluster_ids=( $(echo "$api_out_clusters" | jshon -e data -a -e id) )
   declare -a cluster_names=( $(echo "$api_out_clusters" | jshon -e data -a -e name) )
   declare -a healthstatus=( $(echo "$api_out_clusters" | jshon -e data -a -e componentStatuses -a -e conditions -a -e status -u) )
@@ -192,7 +195,7 @@ if [[ -z $clustername ]]; then
 else
  
 # Check status of a single cluster 
-  api_out_single_cluster=$(curl -s -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/clusters/${clustername}")
+  api_out_single_cluster=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/clusters/${clustername}")
 
   # Check if that given cluster name exists
   if [[ -n $(echo "$api_out_single_cluster" | grep -i "error") ]]
@@ -228,7 +231,7 @@ node)
 if [[ -z $clustername ]]; then 
 
 # Check status of all nodes in all clusters
-  api_out_nodes=$(curl -s -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/nodes")
+  api_out_nodes=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/nodes")
   declare -a node_names=( $(echo "$api_out_nodes" | jshon -e data -a -e nodeName -u) )
   declare -a node_status=( $(echo "$api_out_nodes" | jshon -e data -a -e state -u) )
   declare -a node_cluster_member=( $(echo "$api_out_nodes" | jshon -e data -a -e clusterId -u) )
@@ -257,7 +260,7 @@ if [[ -z $clustername ]]; then
 else 
 
 # Check status of all nodes in a specific clusters
-  api_out_nodes=$(curl -s -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/nodes/?clusterId=${clustername}")
+  api_out_nodes=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/nodes/?clusterId=${clustername}")
 
   # Check if that given cluster name exists
   if [[ -n $(echo "$api_out_nodes" | grep -i "error") ]]
@@ -297,7 +300,7 @@ project)
 if [[ -z $projectname ]]; then 
 
 # Check status of all projects
-  api_out_project=$(curl -s -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project")
+  api_out_project=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project")
   declare -a project_ids=( $(echo "$api_out_project" | jshon -e data -a -e id -u) )
   declare -a project_names=( $(echo "$api_out_project" | jshon -e data -a -e name -u) )
   declare -a cluster_ids=( $(echo "$api_out_project" | jshon -e data -a -e clusterId) )
@@ -327,7 +330,7 @@ if [[ -z $projectname ]]; then
 else
  
 # Check status of a single project 
-  api_out_single_project=$(curl -s -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}")
+  api_out_single_project=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}")
 
   # Check if that given project name exists
   if [[ -n $(echo "$api_out_single_project" | grep -i "error") ]]
@@ -357,7 +360,7 @@ if [ -z $projectname ]; then echo -e "CHECK_RANCHER2 UNKNOWN - To check workload
 if [[ -z $workloadname ]]; then 
 
 # Check status of all workloads within a project (project must be given)
-  api_out_workloads=$(curl -s -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}/workloads")
+  api_out_workloads=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}/workloads")
 
   if [[ -n $(echo "$api_out_workloads" | grep -i "ClusterUnavailable") ]]; then 
     clustername=$(echo ${projectname} | awk -F':' '{print $1}')
@@ -412,7 +415,7 @@ if [[ -z $workloadname ]]; then
 else
  
 # Check status of a single workload
-  api_out_single_workload=$(curl -s -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}/workloads/?name=${workloadname}")
+  api_out_single_workload=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}/workloads/?name=${workloadname}")
 
   if [[ -n $(echo "$api_out_single_workload" | grep -i "ClusterUnavailable") ]]; then 
     clustername=$(echo ${projectname} | awk -F':' '{print $1}')
@@ -448,7 +451,7 @@ if [ -z $projectname ]; then echo -e "CHECK_RANCHER2 UNKNOWN - To check pods you
 if [[ -z $podname ]]; then 
 
 # Check status of all pods within a project (project must be given)
-  api_out_pods=$(curl -s -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}/pods")
+  api_out_pods=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}/pods")
 
   if [[ -n $(echo "$api_out_pods" | grep -i "ClusterUnavailable") ]]; then
     clustername=$(echo ${projectname} | awk -F':' '{print $1}')
@@ -488,7 +491,7 @@ else
 # Check status of a single pod (requires project and namespace)
 # Note: This only makes sense when you create static pods!
   if [ -z $namespacename ]; then echo -e "CHECK_RANCHER2 UNKNOWN - To check a single pod you must also define the namespace (-n)."; exit ${STATE_UNKNOWN}; fi
-  api_out_single_pod=$(curl -s -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}/pods/${namespacename}:${podname}")
+  api_out_single_pod=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}/pods/${namespacename}:${podname}")
 
   if [[ -n $(echo "$api_out_single_pod" | grep -i "ClusterUnavailable") ]]; then
     clustername=$(echo ${projectname} | awk -F':' '{print $1}')
