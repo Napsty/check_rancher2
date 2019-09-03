@@ -31,6 +31,7 @@
 # 20181107 beta8 Missing pod check type in help, documentation completed                 #
 # 20181109 1.0.0 Do not alert for succeeded pods                                         #
 # 20190308 1.1.0 Added node(s) check                                                     #
+# 20190903 1.1.1 Detect invalid hostname (non-API hostname)                              #
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
@@ -39,7 +40,7 @@ STATE_CRITICAL=2        # define the exit code if status is Critical
 STATE_UNKNOWN=3         # define the exit code if status is Unknown
 export PATH=/usr/local/bin:/usr/bin:/bin:$PATH # Set path
 proto=http		# Protocol to use, default is http, can be overwritten with -S parameter
-version=1.1.0
+version=1.1.1
 
 # Check for necessary commands
 for cmd in jshon curl [
@@ -108,7 +109,9 @@ if [ -z $type ]; then echo -e "CHECK_RANCHER2 UNKNOWN - Missing check type"; exi
 apicheck=$(curl -s -o /dev/null -w "%{http_code}" -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project")
 
 # Detect failures
-if [[ $apicheck = 301 ]]
+if [[ $apicheck = 000 ]]
+then echo -e "CHECK_RANCHER2 UNKNOWN - Invalid host address detected: ${apihost}. Use valid IP or DNS name on which the Rancher 2 API is accessible."; exit ${STATE_UNKNOWN}
+elif [[ $apicheck = 301 ]]
 then echo -e "CHECK_RANCHER2 UNKNOWN - Redirect detected. Maybe http to https? Use -S parameter."; exit ${STATE_UNKNOWN}
 elif [[ $apicheck = 302 ]]
 then echo -e "CHECK_RANCHER2 UNKNOWN - Redirect detected. Maybe http to https? Use -S parameter."; exit ${STATE_UNKNOWN}
