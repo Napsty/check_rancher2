@@ -32,7 +32,7 @@
 # 20181109 1.0.0 Do not alert for succeeded pods                                         #
 # 20190308 1.1.0 Added node(s) check                                                     #
 # 20190903 1.1.1 Detect invalid hostname (non-API hostname)                              #
-# 20190903 1.2.0 Allow self-signed certificates                                          #
+# 20190903 1.2.0 Allow self-signed certificates (-s)                                     #
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
