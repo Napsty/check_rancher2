@@ -222,7 +222,7 @@ else
     echo "CHECK_RANCHER2 CRITICAL - Cluster $clustername: ${componenterrors[*]}|'cluster_healthy'=0;;;; 'cluster_errors'=${#componenterrors[*]};;;;"
     exit ${STATE_CRITICAL}
   else
-    echo "CHECK_RANCHER2 OK - Cluster $clustername is healthy|'cluster_healthy'=0;;;; 'cluster_errors'=${#componenterrors[*]};;;;"
+    echo "CHECK_RANCHER2 OK - Cluster $clustername is healthy|'cluster_healthy'=1;;;; 'cluster_errors'=${#componenterrors[*]};;;;"
     exit ${STATE_OK}
   fi
 
