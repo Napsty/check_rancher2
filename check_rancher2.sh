@@ -16,8 +16,10 @@
 # WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A        #
 # PARTICULAR PURPOSE.  See the GNU General Public License for more details.              #
 # You should have received a copy of the GNU General Public License along with this      #
-# program; if not, write to the Free Software Foundation, Inc., 51 Franklin Street,      #
-# Fifth Floor, Boston, MA, 02110-1301, USA.                                              #
+# program; if not, see <https://www.gnu.org/licenses/>.                                  #
+#                                                                                        #
+# Copyright 2018-2020 Claudio Kuenzler                                                   #
+# Copyright 2020 Matthias Kneer                                                          #
 #											 #
 # History:                                                                               #
 # 20180629 alpha Started programming of script                                           #
@@ -34,6 +36,7 @@
 # 20190903 1.1.1 Detect invalid hostname (non-API hostname)                              #
 # 20190903 1.2.0 Allow self-signed certificates (-s)                                     #
 # 20190913 1.2.1 Detect additional redirect (308)                                        #
+# 20200129 1.2.2 Fix typos in workload perfdata (#11) and single cluster health (#12)    #
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
@@ -42,7 +45,7 @@ STATE_CRITICAL=2        # define the exit code if status is Critical
 STATE_UNKNOWN=3         # define the exit code if status is Unknown
 export PATH=/usr/local/bin:/usr/bin:/bin:$PATH # Set path
 proto=http		# Protocol to use, default is http, can be overwritten with -S parameter
-version=1.2.1
+version=1.2.2
 
 # Check for necessary commands
 for cmd in jshon curl [
@@ -55,7 +58,7 @@ do
 done
 #########################################################################
 # We all need help from time to time
-help="check_rancher2 v ${version} (c) 2018-2019 Claudio Kuenzler (published under GPLv2)\n
+help="check_rancher2 v ${version} (c) 2018-2020 Claudio Kuenzler and contributers (published under GPLv2)\n
 Usage: $0 -H Rancher2Address -U user-token -P password [-S] -t checktype [-c cluster] [-p project] [-w workload]\n
 \nOptions:\n
 \t-H Address of Rancher 2 API (e.g. rancher.example.com)\n
