@@ -410,7 +410,7 @@ if [[ -z $workloadname ]]; then
   else
     if [[ ${#workloadpaused[*]} -gt 0 ]]
       then echo "CHECK_RANCHER2 OK - All workloads (${#workload_names[*]}) in project ${projectname} are healthy/active ( Note: ${#workloadpaused[*]} workloads currently paused: ${workloadpaused[*]})|'workloads_total'=${#workload_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;; 'workloads_warnings'=${#workloadwarnings[*]};;;; 'workloads_paused'=${#workloadpaused[*]};;;;"
-      else echo "CHECK_RANCHER2 OK - All workloads (${#workload_names[*]}) in project ${projectname} are healthy/active|'workloads_total'=${#workloads_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;; 'workloads_warnings'=${#workloadwarnings[*]};;;; 'workloads_paused'=${#workloadpaused[*]};;;;"
+      else echo "CHECK_RANCHER2 OK - All workloads (${#workload_names[*]}) in project ${projectname} are healthy/active|'workloads_total'=${#workload_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;; 'workloads_warnings'=${#workloadwarnings[*]};;;; 'workloads_paused'=${#workloadpaused[*]};;;;"
     fi
     exit ${STATE_OK}
   fi
