@@ -210,6 +210,14 @@ else
 
   declare -a component=( $(echo "$api_out_single_cluster" | jshon -e componentStatuses -a -e name -u) )
   declare -a healthstatus=( $(echo "$api_out_single_cluster" | jshon -e componentStatuses -a -e conditions -a -e status -u) )
+  # capacity
+  declare -a capacity_cpu=( $(echo "$api_out_single_cluster" | jshon -e capacity -e cpu -u) )
+  declare -a capacity_memory=( $(echo "$api_out_single_cluster" | jshon -e capacity -e memory -u) )
+  declare -a capacity_pods=( $(echo "$api_out_single_cluster" | jshon -e capacity -e pods -u) )
+  # requested
+  declare -a requested_cpu=( $(echo "$api_out_single_cluster" | jshon -e requested -e cpu -u) )
+  declare -a requested_memory=( $(echo "$api_out_single_cluster" | jshon -e requested -e memory -u) )
+  declare -a requested_pods=( $(echo "$api_out_single_cluster" | jshon -e requested -e pods -u) )
   
   i=0
   for status in ${healthstatus[*]}
@@ -222,10 +230,10 @@ else
   
   if [[ ${#componenterrors[*]} -gt 0 ]]
   then 
-    echo "CHECK_RANCHER2 CRITICAL - Cluster $clustername: ${componenterrors[*]}|'cluster_healthy'=0;;;; 'cluster_errors'=${#componenterrors[*]};;;;"
+    echo "CHECK_RANCHER2 CRITICAL - Cluster $clustername: ${componenterrors[*]}|'cluster_healthy'=0;;;; 'cluster_errors'=${#componenterrors[*]};;;; 'capacity_cpu'=${capacity_cpu};;;; 'capacity_memory'=${capacity_memory};;;; 'capacity_pods'=${capacity_pods} 'requested_cpu'=${requested_cpu};;;; 'requested_memory'=${requested_memory};;;; 'requested_pods'=${requested_pods};;;;"
     exit ${STATE_CRITICAL}
   else
-    echo "CHECK_RANCHER2 OK - Cluster $clustername is healthy|'cluster_healthy'=1;;;; 'cluster_errors'=${#componenterrors[*]};;;;"
+    echo "CHECK_RANCHER2 OK - Cluster $clustername is healthy|'cluster_healthy'=1;;;; 'cluster_errors'=${#componenterrors[*]};;;; 'capacity_cpu'=${capacity_cpu};;;; 'capacity_memory'=${capacity_memory};;;; 'capacity_pods'=${capacity_pods} 'requested_cpu'=${requested_cpu};;;; 'requested_memory'=${requested_memory};;;; 'requested_pods'=${requested_pods};;;;"
     exit ${STATE_OK}
   fi
 
