@@ -231,6 +231,9 @@ else
   # convert capacity_cpu to be compareable with requested_cpu
   capacity_cpu=$(( ${capacity_cpu} * 1000 ))
 
+  # remove unit from requested_cpu
+  requested_cpu=( $(echo "${requested_cpu}" | sed 's/[a-zA-Z]*$//g') )
+
   i=0
   for status in ${healthstatus[*]}
   do 
