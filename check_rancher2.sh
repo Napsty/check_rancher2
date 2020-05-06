@@ -219,6 +219,18 @@ else
   declare -a requested_memory=( $(echo "$api_out_single_cluster" | jshon -e requested -e memory -u) )
   declare -a requested_pods=( $(echo "$api_out_single_cluster" | jshon -e requested -e pods -u) )
   
+  # convert reqested_memory dependened by unit
+  # get unit
+  declare -a requested_memory_unit=( $(echo "${requested_memory}" | sed 's/^[0-9]*//g') )
+  declare -a requested_memory_count=( $(echo "${requested_memory}" | sed 's/[a-zA-Z]*$//g') )    
+  if [[ $requested_memory_unit == "Mi" ]]
+  then
+    requested_memory=$(( ${requested_memory_count} * 1024 * 1024 ))
+  elif [[ $requested_memory_unit == "Ki" ]]
+  then
+    requested_memory=$(( ${requested_memory_count} * 1024 ))
+  fi
+
   # convert capacity_memory dependened by unit
   # get unit
   declare -a capacity_memory_unit=( $(echo "${capacity_memory}" | sed 's/^[0-9]*//g') )
