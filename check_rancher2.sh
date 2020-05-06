@@ -219,6 +219,18 @@ else
   declare -a requested_memory=( $(echo "$api_out_single_cluster" | jshon -e requested -e memory -u) )
   declare -a requested_pods=( $(echo "$api_out_single_cluster" | jshon -e requested -e pods -u) )
   
+  # convert capacity_memory dependened by unit
+  # get unit
+  declare -a capacity_memory_unit=( $(echo "${capacity_memory}" | sed 's/^[0-9]*//g') )
+  if [[ $capacity_memory_unit == "Ki" ]]
+  then
+    declare -a capacity_memory_count=( $(echo "${capacity_memory}" | sed 's/[a-zA-Z]*$//g') )    
+    capacity_memory=$(( ${capacity_memory_count} * 1024 ))
+  fi
+
+  # convert capacity_cpu to be compareable with requested_cpu
+  capacity_cpu=$(( ${capacity_cpu} * 1000 ))
+
   i=0
   for status in ${healthstatus[*]}
   do 
