@@ -128,7 +128,7 @@ then echo -e "CHECK_RANCHER2 UNKNOWN - Redirect detected. Maybe http to https? U
 elif [[ $apicheck = 401 ]]
 then echo -e "CHECK_RANCHER2 WARNING - Authentication failed"; exit ${STATE_WARNING}
 elif [[ $apicheck = 403 ]]
-then echo -e "CHECK_RANCHER2 WARNING - Access to API forbidden"; exit ${STATE_CRITICAL}
+then echo -e "CHECK_RANCHER2 CRITICAL - Access to API forbidden"; exit ${STATE_CRITICAL}
 elif [[ $apicheck -gt 499 ]]
 then echo -e "CHECK_RANCHER2 CRITICAL - API Returned HTTP $apicheck error"; exit ${STATE_CRITICAL}
 fi
