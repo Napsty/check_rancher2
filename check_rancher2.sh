@@ -37,6 +37,7 @@
 # 20190903 1.2.0 Allow self-signed certificates (-s)                                     #
 # 20190913 1.2.1 Detect additional redirect (308)                                        #
 # 20200129 1.2.2 Fix typos in workload perfdata (#11) and single cluster health (#12)    #
+# 20200523 1.2.3 Handle 403 forbidden error (#15)                                        #
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
@@ -45,7 +46,7 @@ STATE_CRITICAL=2        # define the exit code if status is Critical
 STATE_UNKNOWN=3         # define the exit code if status is Unknown
 export PATH=/usr/local/bin:/usr/bin:/bin:$PATH # Set path
 proto=http		# Protocol to use, default is http, can be overwritten with -S parameter
-version=1.2.2
+version=1.2.3
 
 # Check for necessary commands
 for cmd in jshon curl [
@@ -126,6 +127,8 @@ elif [[ $apicheck = 308 ]]
 then echo -e "CHECK_RANCHER2 UNKNOWN - Redirect detected. Maybe http to https? Use -S parameter."; exit ${STATE_UNKNOWN}
 elif [[ $apicheck = 401 ]]
 then echo -e "CHECK_RANCHER2 WARNING - Authentication failed"; exit ${STATE_WARNING}
+elif [[ $apicheck = 403 ]]
+then echo -e "CHECK_RANCHER2 WARNING - Access to API forbidden"; exit ${STATE_CRITICAL}
 elif [[ $apicheck -gt 499 ]]
 then echo -e "CHECK_RANCHER2 CRITICAL - API Returned HTTP $apicheck error"; exit ${STATE_CRITICAL}
 fi
