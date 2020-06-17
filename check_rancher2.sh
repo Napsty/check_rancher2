@@ -38,6 +38,7 @@
 # 20190913 1.2.1 Detect additional redirect (308)                                        #
 # 20200129 1.2.2 Fix typos in workload perfdata (#11) and single cluster health (#12)    #
 # 20200523 1.2.3 Handle 403 forbidden error (#15)                                        #
+# 20200617 1.3.0 Added ignore parameter (-i)                                             #
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
@@ -46,7 +47,7 @@ STATE_CRITICAL=2        # define the exit code if status is Critical
 STATE_UNKNOWN=3         # define the exit code if status is Unknown
 export PATH=/usr/local/bin:/usr/bin:/bin:$PATH # Set path
 proto=http		# Protocol to use, default is http, can be overwritten with -S parameter
-version=1.2.3
+version=1.3.0
 
 # Check for necessary commands
 for cmd in jshon curl [
@@ -73,11 +74,12 @@ Usage: $0 -H Rancher2Address -U user-token -P password [-S] -t checktype [-c clu
 \t-n Namespace name (needed for specific pod checks)\n
 \t-w Workload name (for specific workload check)\n
 \t-o Pod name (for specific pod check, this makes only sense if you use static pods)\n
+\t-i Comma-separated list of status(es) to ignore (currently only supported in node check type)\n
 \t-h Help. I need somebody. Help. Not just anybody. Heeeeeelp!\n
 \nCheck Types:\n
 \tinfo -> Informs about available clusters and projects and their API ID's. These ID's are needed for specific checks.\n
 \tcluster -> Checks the current status of all clusters or of a specific cluster (defined with -c clusterid)\n
-\tnode -> Checks the current status of all nodes or of nodes in a specific cluster (defined with -c clusterid)\n
+\tnode -> Checks the current status of nodes in all clusters or of nodes in a specific cluster (defined with -c clusterid)\n
 \tproject -> Checks the current status of all projects or of a specific project (defined with -p projectid)\n
 \tworkload -> Checks the current status of all or a specific (-w workloadname) workload within a project (-p projectid must be set!)\n
 \tpod -> Checks the current status of all or a specific (-o podname -n namespace) pod within a project (-p projectid must be set!)\n
@@ -88,7 +90,7 @@ if [ "${1}" = "--help" -o "${#}" = "0" ];
 fi
 #########################################################################
 # Get user-given variables
-while getopts "H:U:P:t:c:p:n:w:o:Ssh" Input;
+while getopts "H:U:P:t:c:p:n:w:o:Ssi:h" Input;
 do
   case ${Input} in
   H)      apihost=${OPTARG};;
@@ -102,6 +104,7 @@ do
   o)      podname=${OPTARG};;
   S)      proto=https;;
   s)      selfsigned="-k";;
+  i)      ignore=${OPTARG};;
   h)      echo -e ${help}; exit ${STATE_UNKNOWN};;
   *)      echo -e ${help}; exit ${STATE_UNKNOWN};;
   esac
@@ -251,7 +254,9 @@ if [[ -z $clustername ]]; then
     for status in ${node_status[$i]}
     do 
       if [[ ${status} != active ]]; then 
-        nodeerrors[$i]="${node} in cluster ${node_cluster_member[$i]} is ${node_status[$i]} -"
+        if [[ -n $(echo ${ignore} | grep -i ${status}) ]]; then break
+        else nodeerrors[$i]="${node} in cluster ${node_cluster_member[$i]} is ${node_status[$i]} -"
+        fi
       fi
     done
   let i++
@@ -285,7 +290,9 @@ else
     for status in ${node_status[$i]}
     do 
       if [[ ${status} != active ]]; then 
-        nodeerrors[$i]="${node} in cluster ${clustername} is ${node_status[$i]} -"
+        if [[ -n $(echo ${ignore} | grep -i ${status}) ]]; then break
+        else nodeerrors[$i]="${node} in cluster ${clustername} is ${node_status[$i]} -"
+        fi
       fi
     done
   let i++
