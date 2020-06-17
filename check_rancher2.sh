@@ -254,20 +254,24 @@ if [[ -z $clustername ]]; then
     for status in ${node_status[$i]}
     do 
       if [[ ${status} != active ]]; then 
-        if [[ -n $(echo ${ignore} | grep -i ${status}) ]]; then break
-        else nodeerrors[$i]="${node} in cluster ${node_cluster_member[$i]} is ${node_status[$i]} -"
+        if [[ -n $(echo ${ignore} | grep -i ${status}) ]]; then
+          nodeignored[$i]="${node} in cluster ${node_cluster_member[$i]} is ${node_status[$i]} but ignored -"
+        else
+          nodeerrors[$i]="${node} in cluster ${node_cluster_member[$i]} is ${node_status[$i]} -"
         fi
       fi
     done
   let i++
   done
 
-  if [[ ${#nodeerrors[*]} -gt 0 ]]
-  then 
-    echo "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;;"
+  if [[ ${#nodeerrors[*]} -gt 0 ]]; then
+    echo "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;;"
     exit ${STATE_CRITICAL}
+  elif [[ ${#nodeignored[*]} -gt 0 ]]; then
+    echo "CHECK_RANCHER2 OK - All nodes OK - Info: ${nodeignored[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;;"
+    exit ${STATE_OK}
   else
-    echo "CHECK_RANCHER2 OK - All ${#node_names[*]} nodes are active|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;;"
+    echo "CHECK_RANCHER2 OK - All ${#node_names[*]} nodes are active|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;;"
     exit ${STATE_OK}
   fi
 
@@ -290,20 +294,24 @@ else
     for status in ${node_status[$i]}
     do 
       if [[ ${status} != active ]]; then 
-        if [[ -n $(echo ${ignore} | grep -i ${status}) ]]; then break
-        else nodeerrors[$i]="${node} in cluster ${clustername} is ${node_status[$i]} -"
+        if [[ -n $(echo ${ignore} | grep -i ${status}) ]]; then
+          nodeignored[$i]="${node} in cluster ${node_cluster_member[$i]} is ${node_status[$i]} but ignored -"
+        else
+          nodeerrors[$i]="${node} in cluster ${clustername} is ${node_status[$i]} -"
         fi
       fi
     done
   let i++
   done
 
-  if [[ ${#nodeerrors[*]} -gt 0 ]]
-  then 
-    echo "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;;"
+  if [[ ${#nodeerrors[*]} -gt 0 ]]; then
+    echo "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;;"
     exit ${STATE_CRITICAL}
+  elif [[ ${#nodeignored[*]} -gt 0 ]]; then
+    echo "CHECK_RANCHER2 OK - All nodes OK - Info: ${nodeignored[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;;"
+    exit ${STATE_OK}
   else
-    echo "CHECK_RANCHER2 OK - All ${#node_names[*]} nodes are active|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;;"
+    echo "CHECK_RANCHER2 OK - All ${#node_names[*]} nodes are active|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;;"
     exit ${STATE_OK}
   fi
 
