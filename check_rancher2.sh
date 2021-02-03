@@ -489,6 +489,7 @@ if [[ -z $podname ]]; then
 # Check status of all pods within a project (project must be given)
   if [[ -n $namespacename && $namespacename != "" ]]; then
     nsappend="?namespaceId=$namespacename"
+    outputappend="and namespace $namespacename "
   fi
 
   api_out_pods=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}/pods${nsappend}")
@@ -523,7 +524,7 @@ if [[ -z $podname ]]; then
     echo "CHECK_RANCHER2 CRITICAL - ${poderrors[*]}|'pods_total'=${#pod_names[*]};;;; 'pods_errors'=${#poderrors[*]};;;;"
     exit ${STATE_CRITICAL}
   else
-    echo "CHECK_RANCHER2 OK - All pods (${#pod_names[*]}) in project ${projectname} are running|'pods_total'=${#pod_names[*]};;;; 'pods_errors'=${#poderrors[*]};;;;"
+    echo "CHECK_RANCHER2 OK - All pods (${#pod_names[*]}) in project ${projectname} ${outputappend}are running|'pods_total'=${#pod_names[*]};;;; 'pods_errors'=${#poderrors[*]};;;;"
     exit ${STATE_OK}
   fi
 
