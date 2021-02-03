@@ -18,7 +18,7 @@
 # You should have received a copy of the GNU General Public License along with this      #
 # program; if not, see <https://www.gnu.org/licenses/>.                                  #
 #                                                                                        #
-# Copyright 2018-2020 Claudio Kuenzler                                                   #
+# Copyright 2018-2021 Claudio Kuenzler                                                   #
 # Copyright 2020 Matthias Kneer                                                          #
 #											 #
 # History:                                                                               #
@@ -39,6 +39,7 @@
 # 20200129 1.2.2 Fix typos in workload perfdata (#11) and single cluster health (#12)    #
 # 20200523 1.2.3 Handle 403 forbidden error (#15)                                        #
 # 20200617 1.3.0 Added ignore parameter (-i)                                             #
+# 20210203 1.4.0 Checking specific workloads and pods inside a namespace                 #
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
@@ -47,7 +48,7 @@ STATE_CRITICAL=2        # define the exit code if status is Critical
 STATE_UNKNOWN=3         # define the exit code if status is Unknown
 export PATH=/usr/local/bin:/usr/bin:/bin:$PATH # Set path
 proto=http		# Protocol to use, default is http, can be overwritten with -S parameter
-version=1.3.0
+version=1.4.0
 
 # Check for necessary commands
 for cmd in jshon curl [
@@ -60,7 +61,7 @@ do
 done
 #########################################################################
 # We all need help from time to time
-help="check_rancher2 v ${version} (c) 2018-2020 Claudio Kuenzler and contributers (published under GPLv2)\n
+help="check_rancher2 v ${version} (c) 2018-2021 Claudio Kuenzler and contributers (published under GPLv2)\n
 Usage: $0 -H Rancher2Address -U user-token -P password [-S] -t checktype [-c cluster] [-p project] [-w workload]\n
 \nOptions:\n
 \t-H Address of Rancher 2 API (e.g. rancher.example.com)\n
@@ -71,7 +72,7 @@ Usage: $0 -H Rancher2Address -U user-token -P password [-S] -t checktype [-c clu
 \t-t Check type (see list below for available check types)\n
 \t-c Cluster name (for specific cluster check)\n
 \t-p Project name (for specific project check, needed for workload checks)\n
-\t-n Namespace name (needed for specific pod checks)\n
+\t-n Namespace name (needed for specific workload or pod checks)\n
 \t-w Workload name (for specific workload check)\n
 \t-o Pod name (for specific pod check, this makes only sense if you use static pods)\n
 \t-i Comma-separated list of status(es) to ignore (currently only supported in node check type)\n
@@ -439,7 +440,11 @@ if [[ -z $workloadname ]]; then
 else
  
 # Check status of a single workload
-  api_out_single_workload=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}/workloads/?name=${workloadname}")
+  if [[ -n $namespacename && $namespacename != "" ]]; then
+    nsappend="&namespaceId=$namespacename"
+  fi
+
+  api_out_single_workload=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}/workloads/?name=${workloadname}${nsappend}")
 
   if [[ -n $(echo "$api_out_single_workload" | grep -i "ClusterUnavailable") ]]; then 
     clustername=$(echo ${projectname} | awk -F':' '{print $1}')
@@ -447,8 +452,15 @@ else
   fi
 
   # Check if that given project name exists
-  if [[ -z $(echo "$api_out_single_workload" | grep -i "containers") ]]
-    then echo "CHECK_RANCHER2 CRITICAL - Workload $workloadname not found."; exit ${STATE_CRITICAL}
+  if [[ -z $(echo "$api_out_single_workload" | grep -i "containers") ]]; then
+    echo "CHECK_RANCHER2 CRITICAL - Workload $workloadname not found."; exit ${STATE_CRITICAL}
+  fi
+
+  # Check if there are multiple workloads with the same name
+  workloadcount=$(echo "$api_out_single_workload" | jshon -e data -a -e id -u | wc -l)
+  if [[ $workloadcount -gt 1 ]]; then
+    echo "CHECK_RANCHER2 UNKNOWN - Identical workload names detected in multiple namespaces. To check a specific workload you must also define the namespace (-n)."
+    exit ${STATE_CRITICAL}
   fi
 
   healthstatus=$(echo "$api_out_single_workload" | jshon -e data -a -e state -u)
@@ -475,7 +487,11 @@ if [ -z $projectname ]; then echo -e "CHECK_RANCHER2 UNKNOWN - To check pods you
 if [[ -z $podname ]]; then 
 
 # Check status of all pods within a project (project must be given)
-  api_out_pods=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}/pods")
+  if [[ -n $namespacename && $namespacename != "" ]]; then
+    nsappend="?namespaceId=$namespacename"
+  fi
+
+  api_out_pods=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}/pods${nsappend}")
 
   if [[ -n $(echo "$api_out_pods" | grep -i "ClusterUnavailable") ]]; then
     clustername=$(echo ${projectname} | awk -F':' '{print $1}')
