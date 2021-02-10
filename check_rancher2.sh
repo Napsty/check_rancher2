@@ -39,7 +39,7 @@
 # 20200129 1.2.2 Fix typos in workload perfdata (#11) and single cluster health (#12)    #
 # 20200523 1.2.3 Handle 403 forbidden error (#15)                                        #
 # 20200617 1.3.0 Added ignore parameter (-i)                                             #
-# 20210203 1.4.0 Checking specific workloads and pods inside a namespace                 #
+# 20210210 1.4.0 Checking specific workloads and pods inside a namespace                 #
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
