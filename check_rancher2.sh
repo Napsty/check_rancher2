@@ -186,13 +186,14 @@ if [[ -z $clustername ]]; then
   for cluster in ${cluster_ids[*]}
   do
     #echo $cluster # For Debug
+    clusteralias=$(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'")|.name')
     declare -a component=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'")' | jshon -e componentStatuses -a -e name) )
     declare -a healthstatus=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'")' | jshon -e componentStatuses -a -e conditions -a -e status -u) )
     c=0
     for status in ${healthstatus[*]}
     do 
       if [[ ${status} != True ]]; then 
-        componenterrors[$e]="${component[$c]} in cluster ${cluster} is not healthy -"
+        componenterrors[$e]="${component[$c]} in cluster ${clusteralias} is not healthy -"
         clustererrors[$e]="${cluster}"
       fi
       #echo "${component[$c]} ${status}" # For Debug
@@ -222,6 +223,7 @@ else
     then echo "CHECK_RANCHER2 CRITICAL - Cluster $clustername not found. Hint: Use '-t info' to identify cluster and project names."; exit ${STATE_CRITICAL}
   fi
 
+  clusteralias=$(echo "$api_out_single_cluster" | jq -r '.name')
   declare -a component=( $(echo "$api_out_single_cluster" | jshon -e componentStatuses -a -e name -u) )
   declare -a healthstatus=( $(echo "$api_out_single_cluster" | jshon -e componentStatuses -a -e conditions -a -e status -u) )
   
@@ -236,10 +238,10 @@ else
   
   if [[ ${#componenterrors[*]} -gt 0 ]]
   then 
-    echo "CHECK_RANCHER2 CRITICAL - Cluster $clustername: ${componenterrors[*]}|'cluster_healthy'=0;;;; 'cluster_errors'=${#componenterrors[*]};;;;"
+    echo "CHECK_RANCHER2 CRITICAL - Cluster $clusteralias: ${componenterrors[*]}|'cluster_healthy'=0;;;; 'component_errors'=${#componenterrors[*]};;;;"
     exit ${STATE_CRITICAL}
   else
-    echo "CHECK_RANCHER2 OK - Cluster $clustername is healthy|'cluster_healthy'=1;;;; 'cluster_errors'=${#componenterrors[*]};;;;"
+    echo "CHECK_RANCHER2 OK - Cluster $clusteralias is healthy|'cluster_healthy'=1;;;; 'component_errors'=${#componenterrors[*]};;;;"
     exit ${STATE_OK}
   fi
 
