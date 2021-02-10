@@ -51,7 +51,7 @@ proto=http		# Protocol to use, default is http, can be overwritten with -S param
 version=1.4.0
 
 # Check for necessary commands
-for cmd in jshon curl [
+for cmd in jshon jq curl [
 do
  if ! `which ${cmd} 1>/dev/null`
  then
@@ -179,26 +179,33 @@ if [[ -z $clustername ]]; then
 
 # Check status of all clusters
   api_out_clusters=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/clusters")
-  declare -a cluster_ids=( $(echo "$api_out_clusters" | jshon -e data -a -e id) )
+  declare -a cluster_ids=( $(echo "$api_out_clusters" | jshon -e data -a -e id -u) )
   declare -a cluster_names=( $(echo "$api_out_clusters" | jshon -e data -a -e name) )
-  declare -a healthstatus=( $(echo "$api_out_clusters" | jshon -e data -a -e componentStatuses -a -e conditions -a -e status -u) )
-  declare -a component=( $(echo "$api_out_clusters" | jshon -e data -a -e componentStatuses -a -e name -u) )
   
+  e=0
   for cluster in ${cluster_ids[*]}
   do
-    i=0
+    #echo $cluster # For Debug
+    declare -a component=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'")' | jshon -e componentStatuses -a -e name) )
+    declare -a healthstatus=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'")' | jshon -e componentStatuses -a -e conditions -a -e status -u) )
+    c=0
     for status in ${healthstatus[*]}
     do 
       if [[ ${status} != True ]]; then 
-        componenterrors[$i]="${component[$i]} in cluster ${cluster} is not healthy -"
+        componenterrors[$e]="${component[$c]} in cluster ${cluster} is not healthy -"
+        clustererrors[$e]="${cluster}"
       fi
+      #echo "${component[$c]} ${status}" # For Debug
+      let c++
+      let e++
     done
-    let i++
   done
+
+  clustererrorcount=$(echo ${clustererrors[*]} | tr ' ' '\n' | sort -u | tr '\n' ' ' | wc -w)
 
   if [[ ${#componenterrors[*]} -gt 0 ]]
   then 
-    echo "CHECK_RANCHER2 CRITICAL - ${componenterrors[*]}|'clusters_total'=${#cluster_ids[*]};;;; 'clusters_errors'=${#componenterrors[*]};;;;"
+    echo "CHECK_RANCHER2 CRITICAL - ${componenterrors[*]}|'clusters_total'=${#cluster_ids[*]};;;; 'clusters_errors'=${clustererrorcount};;;;"
     exit ${STATE_CRITICAL}
   else
     echo "CHECK_RANCHER2 OK - All clusters (${#cluster_ids[*]}) are healthy|'clusters_total'=${#cluster_ids[*]};;;; 'clusters_errors'=${#componenterrors[*]};;;;"
