@@ -40,6 +40,7 @@
 # 20200523 1.2.3 Handle 403 forbidden error (#15)                                        #
 # 20200617 1.3.0 Added ignore parameter (-i)                                             #
 # 20210210 1.4.0 Checking specific workloads and pods inside a namespace                 #
+# 20210413 1.5.0 Plugin now uses jq instead of jshon, fix cluster error check (#19)      #
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
@@ -48,7 +49,7 @@ STATE_CRITICAL=2        # define the exit code if status is Critical
 STATE_UNKNOWN=3         # define the exit code if status is Unknown
 export PATH=/usr/local/bin:/usr/bin:/bin:$PATH # Set path
 proto=http		# Protocol to use, default is http, can be overwritten with -S parameter
-version=1.4.0
+version=1.5.0
 
 # Check for necessary commands
 for cmd in jq curl [
