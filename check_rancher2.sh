@@ -21,7 +21,7 @@
 # Copyright 2018-2021 Claudio Kuenzler                                                   #
 # Copyright 2020 Matthias Kneer                                                          #
 # Copyright 2021 Steffen Eichler                                                         #
-#											 #
+#                                                                                        #
 # History:                                                                               #
 # 20180629 alpha Started programming of script                                           #
 # 20180713 beta1 Public release in repository                                            #
