@@ -222,7 +222,7 @@ else
   api_out_single_cluster=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/clusters/${clustername}")
 
   # Check if that given cluster name exists
-  if [[ -n $(echo "$api_out_single_cluster" | grep -i "error") ]]
+  if [[ -n $(echo "$api_out_single_cluster" | grep -i "NotFound") ]]
     then echo "CHECK_RANCHER2 CRITICAL - Cluster $clustername not found. Hint: Use '-t info' to identify cluster and project names."; exit ${STATE_CRITICAL}
   fi
 
