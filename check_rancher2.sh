@@ -21,6 +21,7 @@
 # Copyright 2018-2021 Claudio Kuenzler                                                   #
 # Copyright 2020 Matthias Kneer                                                          #
 # Copyright 2021 Steffen Eichler                                                         #
+# Copyright 2021 lopf                                                                    #
 #                                                                                        #
 # History:                                                                               #
 # 20180629 alpha Started programming of script                                           #
@@ -43,6 +44,7 @@
 # 20210210 1.4.0 Checking specific workloads and pods inside a namespace                 #
 # 20210413 1.5.0 Plugin now uses jq instead of jshon, fix cluster error check (#19)      #
 # 20210504 1.6.0 Add usage performance data on single cluster check, fix project check   #
+# 20210824 1.6.1 Fix cluster not found error (#24)                                       #
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
@@ -51,7 +53,7 @@ STATE_CRITICAL=2        # define the exit code if status is Critical
 STATE_UNKNOWN=3         # define the exit code if status is Unknown
 export PATH=/usr/local/bin:/usr/bin:/bin:$PATH # Set path
 proto=http		# Protocol to use, default is http, can be overwritten with -S parameter
-version=1.6.0
+version=1.6.1
 
 # Check for necessary commands
 for cmd in jq curl [
