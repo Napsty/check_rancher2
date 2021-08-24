@@ -44,7 +44,7 @@
 # 20210210 1.4.0 Checking specific workloads and pods inside a namespace                 #
 # 20210413 1.5.0 Plugin now uses jq instead of jshon, fix cluster error check (#19)      #
 # 20210504 1.6.0 Add usage performance data on single cluster check, fix project check   #
-# 20210824 1.6.1 Fix cluster not found error (#24)                                       #
+# 20210824 1.6.1 Fix cluster and project not found error (#24)                           #
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
@@ -329,11 +329,11 @@ if [[ -z $clustername ]]; then
 
 else
 
-# Check status of all nodes in a specific clusters
+# Check status of all nodes in a specific cluster
   api_out_nodes=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/nodes/?clusterId=${clustername}")
 
   # Check if that given cluster name exists
-  if [[ -n $(echo "$api_out_nodes" | grep -i "error") ]]
+  if [[ -n $(echo "$api_out_nodes" | grep -i "NotFound") ]]
     then echo "CHECK_RANCHER2 CRITICAL - Cluster $clustername not found. Hint: Use '-t info' to identify cluster and project names."; exit ${STATE_CRITICAL}
   fi
 
@@ -406,7 +406,7 @@ else
   api_out_single_project=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}")
 
   # Check if that given project name exists
-  if [[ -n $(echo "$api_out_single_project" | grep -i "error") ]]
+  if [[ -n $(echo "$api_out_single_project" | grep -i "NotFound") ]]
     then echo "CHECK_RANCHER2 CRITICAL - Project $projectname not found. Hint: Use '-t info' to identify cluster and project names."; exit ${STATE_CRITICAL}
   fi
 
