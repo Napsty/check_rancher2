@@ -45,6 +45,7 @@
 # 20210413 1.5.0 Plugin now uses jq instead of jshon, fix cluster error check (#19)      #
 # 20210504 1.6.0 Add usage performance data on single cluster check, fix project check   #
 # 20210824 1.6.1 Fix cluster and project not found error (#24)                           #
+# TBD 1.7.0 Check for additional node conditions (#27)                                   #
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
@@ -53,7 +54,7 @@ STATE_CRITICAL=2        # define the exit code if status is Critical
 STATE_UNKNOWN=3         # define the exit code if status is Unknown
 export PATH=/usr/local/bin:/usr/bin:/bin:$PATH # Set path
 proto=http		# Protocol to use, default is http, can be overwritten with -S parameter
-version=1.6.1
+version=1.7.0
 
 # Check for necessary commands
 for cmd in jq curl [
@@ -299,7 +300,12 @@ if [[ -z $clustername ]]; then
   declare -a node_names=( $(echo "$api_out_nodes" | jq -r '.data[].nodeName') )
   declare -a node_status=( $(echo "$api_out_nodes" | jq -r '.data[].state') )
   declare -a node_cluster_member=( $(echo "$api_out_nodes" | jq -r '.data[].clusterId') )
+  declare -a node_diskpressure=( $(echo "$api_out_nodes" | jq -r '.data[].conditions[] | select(.type=="DiskPressure").status' | awk '/True/ {print FNR}' ) )
+  declare -a node_memorypressure=( $(echo "$api_out_nodes" | jq -r '.data[].conditions[] | select(.type=="MemoryPressure").status' | awk '/True/ {print FNR}' ) )
+  declare -a node_kubeletready=( $(echo "$api_out_nodes" | jq -r '.data[].conditions[] | select(.type=="Ready").status' | awk '/False/ {print FNR}' ) )
+  declare -a node_network=( $(echo "$api_out_nodes" | jq -r '.data[].conditions[] | select(.type=="NetworkUnavailable").status' | awk '/True/ {print FNR}' ) )
 
+  # Check node status (user controlled)
   i=0
   for node in ${node_names[*]}
   do
@@ -316,6 +322,35 @@ if [[ -z $clustername ]]; then
   let i++
   done
 
+  # Handle node pressure situations and other conditions (Kubernetes controlled)
+  if [[ ${#node_diskpressure[*]} -gt 0 ]]; then
+    for n in ${node_diskpressure[*]}; do
+      hostid=$(( $n - 1 ))
+      nodeerrors+=("${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} has Disk Pressure -")
+    done
+  fi
+
+  if [[ ${#node_memorypressure[*]} -gt 0 ]]; then
+    for n in ${node_memorypressure[*]}; do
+      hostid=$(( $n - 1 ))
+      nodeerrors+=("${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} has Memory Pressure -")
+    done
+  fi
+
+  if [[ ${#node_kubeletready[*]} -gt 0 ]]; then
+    for n in ${node_kubeletready[*]}; do
+      hostid=$(( $n - 1 ))
+      nodeerrors+=("Kubelet on node ${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} is not ready -")
+    done
+  fi
+
+  if [[ ${#node_network[*]} -gt 0 ]]; then
+    for n in ${node_network[*]}; do
+      hostid=$(( $n - 1 ))
+      nodeerrors+=("Network on node ${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} is unavailable -")
+    done
+  fi
+
   if [[ ${#nodeerrors[*]} -gt 0 ]]; then
     echo "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;;"
     exit ${STATE_CRITICAL}
@@ -331,6 +366,10 @@ else
 
 # Check status of all nodes in a specific cluster
   api_out_nodes=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/nodes/?clusterId=${clustername}")
+  declare -a node_diskpressure=( $(echo "$api_out_nodes" | jq -r '.data[].conditions[] | select(.type=="DiskPressure").status' | awk '/True/ {print FNR}' ) )
+  declare -a node_memorypressure=( $(echo "$api_out_nodes" | jq -r '.data[].conditions[] | select(.type=="MemoryPressure").status' | awk '/True/ {print FNR}' ) )
+  declare -a node_kubeletready=( $(echo "$api_out_nodes" | jq -r '.data[].conditions[] | select(.type=="Ready").status' | awk '/False/ {print FNR}' ) )
+  declare -a node_network=( $(echo "$api_out_nodes" | jq -r '.data[].conditions[] | select(.type=="NetworkUnavailable").status' | awk '/True/ {print FNR}' ) )
 
   # Check if that given cluster name exists
   if [[ -n $(echo "$api_out_nodes" | grep -i "NotFound") ]]
@@ -340,6 +379,7 @@ else
   declare -a node_names=( $(echo "$api_out_nodes" | jq -r '.data[].nodeName') )
   declare -a node_status=( $(echo "$api_out_nodes" | jq -r '.data[].state') )
 
+  # Check node status (user controlled)
   i=0
   for node in ${node_names[*]}
   do
@@ -356,6 +396,45 @@ else
   let i++
   done
 
+  # Handle node pressure situations and other conditions (Kubernetes controlled)
+  if [[ ${#node_diskpressure[*]} -gt 0 ]]; then
+    for n in ${node_diskpressure[*]}; do
+      hostid=$(( $n - 1 ))
+      nodeerrors+=("${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} has Disk Pressure -")
+    done
+  fi
+
+  if [[ ${#node_memorypressure[*]} -gt 0 ]]; then
+    for n in ${node_memorypressure[*]}; do
+      hostid=$(( $n - 1 ))
+      nodeerrors+=("${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} has Memory Pressure -")
+    done
+  fi
+
+  if [[ ${#node_kubeletready[*]} -gt 0 ]]; then
+    for n in ${node_kubeletready[*]}; do
+      hostid=$(( $n - 1 ))
+      nodeerrors+=("Kubelet on node ${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} is not ready -")
+    done
+  fi
+
+  if [[ ${#node_network[*]} -gt 0 ]]; then
+    for n in ${node_network[*]}; do
+      hostid=$(( $n - 1 ))
+      nodeerrors+=("Network on node ${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} is unavailable -")
+    done
+  fi
+
+  if [[ ${#nodeerrors[*]} -gt 0 ]]; then
+    echo "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;;"
+    exit ${STATE_CRITICAL}
+  elif [[ ${#nodeignored[*]} -gt 0 ]]; then
+    echo "CHECK_RANCHER2 OK - All nodes OK - Info: ${nodeignored[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;;"
+    exit ${STATE_OK}
+  else
+    echo "CHECK_RANCHER2 OK - All ${#node_names[*]} nodes are active|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;;"
+    exit ${STATE_OK}
+  fi
   if [[ ${#nodeerrors[*]} -gt 0 ]]; then
     echo "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;;"
     exit ${STATE_CRITICAL}
