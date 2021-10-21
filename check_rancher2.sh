@@ -45,7 +45,7 @@
 # 20210413 1.5.0 Plugin now uses jq instead of jshon, fix cluster error check (#19)      #
 # 20210504 1.6.0 Add usage performance data on single cluster check, fix project check   #
 # 20210824 1.6.1 Fix cluster and project not found error (#24)                           #
-# TBD 1.7.0 Check for additional node conditions (#27)                                   #
+# 20211021 1.7.0 Check for additional node (pressure) conditions (#27)                   #
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
