@@ -46,6 +46,7 @@
 # 20210504 1.6.0 Add usage performance data on single cluster check, fix project check   #
 # 20210824 1.6.1 Fix cluster and project not found error (#24)                           #
 # 20211021 1.7.0 Check for additional node (pressure) conditions (#27)                   #
+# 20211118 1.7.1 Fix cluster state detection (#26)                                       #
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
@@ -54,7 +55,7 @@ STATE_CRITICAL=2        # define the exit code if status is Critical
 STATE_UNKNOWN=3         # define the exit code if status is Unknown
 export PATH=/usr/local/bin:/usr/bin:/bin:$PATH # Set path
 proto=http		# Protocol to use, default is http, can be overwritten with -S parameter
-version=1.7.0
+version=1.7.1
 
 # Check for necessary commands
 for cmd in jq curl [
@@ -193,8 +194,15 @@ if [[ -z $clustername ]]; then
   do
     #echo $cluster # For Debug
     clusteralias=$(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'")|.name')
+    declare -a clusterstate=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'") | .state') )
     declare -a component=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'") | .componentStatuses[].name') )
     declare -a healthstatus=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'") | .componentStatuses[].conditions[].status') )
+
+    if [[ "${clusterstate}" != "active" ]]; then
+        componenterrors[$e]="cluster ${clusteralias} is in ${clusterstate} state -"
+        clustererrors[$e]="${cluster}"
+    fi
+
     c=0
     for status in ${healthstatus[*]}
     do
@@ -230,6 +238,7 @@ else
   fi
 
   clusteralias=$(echo "$api_out_single_cluster" | jq -r '.name')
+  clusterstate=$(echo "$api_out_single_cluster" | jq -r '.state')
   declare -a component=( $(echo "$api_out_single_cluster" | jq -r '.componentStatuses[].name') )
   declare -a healthstatus=( $(echo "$api_out_single_cluster" | jq -r '.componentStatuses[].conditions[].status') )
 
@@ -269,14 +278,15 @@ else
   # remove unit from requested_cpu
   requested_cpu=( $(echo "${requested_cpu}" | sed 's/[a-zA-Z]*$//g') )
 
+  if [[ "${clusterstate}" != "active" ]]; then
+      componenterrors+="cluster ${clusteralias} is in ${clusterstate} state -"
+  fi
   
-  i=0
   for status in ${healthstatus[*]}
   do
     if [[ ${status} != True ]]; then
-      componenterrors[$i]="${component[$i]} is not healthy -"
+      componenterrors+="${component[$i]} is not healthy -"
     fi
-    let i++
   done
   
   if [[ ${#componenterrors[*]} -gt 0 ]]
