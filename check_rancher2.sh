@@ -46,7 +46,7 @@
 # 20210504 1.6.0 Add usage performance data on single cluster check, fix project check   #
 # 20210824 1.6.1 Fix cluster and project not found error (#24)                           #
 # 20211021 1.7.0 Check for additional node (pressure) conditions (#27)                   #
-# 20211118 1.7.1 Fix cluster state detection (#26)                                       #
+# 20211201 1.7.1 Fix cluster state detection (#26)                                       #
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
