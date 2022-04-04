@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash 
 ##########################################################################################
 # Script/Plugin: check_rancher2.sh                                                       #
 # Author:        Claudio Kuenzler                                                        #
@@ -20,7 +20,9 @@
 #                                                                                        #
 # Copyright 2018-2021 Claudio Kuenzler                                                   #
 # Copyright 2020 Matthias Kneer                                                          #
-#											 #
+# Copyright 2021 Steffen Eichler                                                         #
+# Copyright 2021 lopf                                                                    #
+#                                                                                        #
 # History:                                                                               #
 # 20180629 alpha Started programming of script                                           #
 # 20180713 beta1 Public release in repository                                            #
@@ -41,6 +43,10 @@
 # 20200617 1.3.0 Added ignore parameter (-i)                                             #
 # 20210210 1.4.0 Checking specific workloads and pods inside a namespace                 #
 # 20210413 1.5.0 Plugin now uses jq instead of jshon, fix cluster error check (#19)      #
+# 20210504 1.6.0 Add usage performance data on single cluster check, fix project check   #
+# 20210824 1.6.1 Fix cluster and project not found error (#24)                           #
+# 20211021 1.7.0 Check for additional node (pressure) conditions (#27)                   #
+# 20211201 1.7.1 Fix cluster state detection (#26)                                       #
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
@@ -49,7 +55,7 @@ STATE_CRITICAL=2        # define the exit code if status is Critical
 STATE_UNKNOWN=3         # define the exit code if status is Unknown
 export PATH=/usr/local/bin:/usr/bin:/bin:$PATH # Set path
 proto=http		# Protocol to use, default is http, can be overwritten with -S parameter
-version=1.5.0
+version=1.7.1
 
 # Check for necessary commands
 for cmd in jq curl [
@@ -139,7 +145,7 @@ then echo -e "CHECK_RANCHER2 CRITICAL - API Returned HTTP $apicheck error"; exit
 fi
 #########################################################################
 # Do the checks
-case ${type} in
+case ${type} in 
 
 # --- info --- #
 info)
@@ -171,7 +177,7 @@ done
 
 
 echo "CHECK_RANCHER2 OK - Found ${#cluster_ids[*]} clusters: ${pretty_clusters[*]} and ${#project_ids[*]} projects: ${pretty_projects[*]}|'clusters'=${#cluster_ids[*]};;;; 'projects'=${#project_ids[*]};;;;"
-exit ${STATE_OK}
+exit ${STATE_OK} 
 ;;
 
 # --- cluster status check --- #
@@ -188,12 +194,19 @@ if [[ -z $clustername ]]; then
   do
     #echo $cluster # For Debug
     clusteralias=$(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'")|.name')
+    declare -a clusterstate=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'") | .state') )
     declare -a component=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'") | .componentStatuses[].name') )
     declare -a healthstatus=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'") | .componentStatuses[].conditions[].status') )
+
+    if [[ "${clusterstate}" != "active" ]]; then
+        componenterrors[$e]="cluster ${clusteralias} is in ${clusterstate} state -"
+        clustererrors[$e]="${cluster}"
+    fi
+
     c=0
     for status in ${healthstatus[*]}
     do
-      if [[ ${status} != True ]]; then
+      if [[ ${status} != True ]]; then 
         componenterrors[$e]="${component[$c]} in cluster ${clusteralias} is not healthy -"
         clustererrors[$e]="${cluster}"
       fi
@@ -215,27 +228,28 @@ if [[ -z $clustername ]]; then
   fi
 
 else
-
-# Check status of a single cluster
+ 
+# Check status of a single cluster 
   api_out_single_cluster=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/clusters/${clustername}")
 
   # Check if that given cluster name exists
-  if [[ -n $(echo "$api_out_single_cluster" | grep -i "error") ]]
+  if [[ -n $(echo "$api_out_single_cluster" | grep -i "NotFound") ]]
     then echo "CHECK_RANCHER2 CRITICAL - Cluster $clustername not found. Hint: Use '-t info' to identify cluster and project names."; exit ${STATE_CRITICAL}
   fi
 
   clusteralias=$(echo "$api_out_single_cluster" | jq -r '.name')
+  clusterstate=$(echo "$api_out_single_cluster" | jq -r '.state')
   declare -a component=( $(echo "$api_out_single_cluster" | jq -r '.componentStatuses[].name') )
   declare -a healthstatus=( $(echo "$api_out_single_cluster" | jq -r '.componentStatuses[].conditions[].status') )
 
   # capacity
-  declare -a capacity_cpu=( $(echo "$api_out_single_cluster" | jq -r .capacity.cpu) )
-  declare -a capacity_memory=( $(echo "$api_out_single_cluster" | jq -r .capacity.memory) )
-  declare -a capacity_pods=( $(echo "$api_out_single_cluster" | jq -r .capacity.pods) )
+  declare -a capacity_cpu=( $(echo "$api_out_single_cluster" | jq -r '.capacity.cpu') )
+  declare -a capacity_memory=( $(echo "$api_out_single_cluster" | jq -r '.capacity.memory') )
+  declare -a capacity_pods=( $(echo "$api_out_single_cluster" | jq -r '.capacity.pods') )
   # requested
-  declare -a requested_cpu=( $(echo "$api_out_single_cluster" | jq -r .requested.cpu) )
-  declare -a requested_memory=( $(echo "$api_out_single_cluster" | jq -r .requested.memory) )
-  declare -a requested_pods=( $(echo "$api_out_single_cluster" | jq -r .requested.pods) )
+  declare -a requested_cpu=( $(echo "$api_out_single_cluster" | jq -r '.requested.cpu') )
+  declare -a requested_memory=( $(echo "$api_out_single_cluster" | jq -r '.requested.memory') )
+  declare -a requested_pods=( $(echo "$api_out_single_cluster" | jq -r '.requested.pods') )
 
   # convert reqested_memory dependened by unit
   # get unit
@@ -264,21 +278,23 @@ else
   # remove unit from requested_cpu
   requested_cpu=( $(echo "${requested_cpu}" | sed 's/[a-zA-Z]*$//g') )
 
-  i=0
+  if [[ "${clusterstate}" != "active" ]]; then
+      componenterrors+="cluster ${clusteralias} is in ${clusterstate} state -"
+  fi
+  
   for status in ${healthstatus[*]}
   do
     if [[ ${status} != True ]]; then
-      componenterrors[$i]="${component[$i]} is not healthy -"
+      componenterrors+="${component[$i]} is not healthy -"
     fi
-    let i++
   done
-
+  
   if [[ ${#componenterrors[*]} -gt 0 ]]
   then
-    echo "CHECK_RANCHER2 CRITICAL - Cluster $clusteralias: ${componenterrors[*]}|'cluster_healthy'=0;;;; 'component_errors'=${#componenterrors[*]};;;; 'capacity_cpu'=${capacity_cpu};;;; 'capacity_memory'=${capacity_memory};;;; 'capacity_pods'=${capacity_pods} 'requested_cpu'=${requested_cpu};;;; 'requested_memory'=${requested_memory};;;; 'requested_pods'=${requested_pods};;;;"
+    echo "CHECK_RANCHER2 CRITICAL - Cluster $clusteralias: ${componenterrors[*]}|'cluster_healthy'=0;;;; 'component_errors'=${#componenterrors[*]};;;; 'cpu'=${requested_cpu};;;;${capacity_cpu} 'memory'=${requested_memory}B;;;;${capacity_memory} 'pods'=${requested_pods};;;;${capacity_pods}"
     exit ${STATE_CRITICAL}
   else
-    echo "CHECK_RANCHER2 OK - Cluster $clusteralias is healthy|'cluster_healthy'=1;;;; 'component_errors'=${#componenterrors[*]};;;; 'capacity_cpu'=${capacity_cpu};;;; 'capacity_memory'=${capacity_memory};;;; 'capacity_pods'=${capacity_pods} 'requested_cpu'=${requested_cpu};;;; 'requested_memory'=${requested_memory};;;; 'requested_pods'=${requested_pods};;;;"
+    echo "CHECK_RANCHER2 OK - Cluster $clusteralias is healthy|'cluster_healthy'=1;;;; 'component_errors'=${#componenterrors[*]};;;; 'cpu'=${requested_cpu};;;;${capacity_cpu} 'memory'=${requested_memory}B;;;;${capacity_memory} 'pods'=${requested_pods};;;;${capacity_pods}" 
     exit ${STATE_OK}
   fi
 
@@ -294,7 +310,12 @@ if [[ -z $clustername ]]; then
   declare -a node_names=( $(echo "$api_out_nodes" | jq -r '.data[].nodeName') )
   declare -a node_status=( $(echo "$api_out_nodes" | jq -r '.data[].state') )
   declare -a node_cluster_member=( $(echo "$api_out_nodes" | jq -r '.data[].clusterId') )
+  declare -a node_diskpressure=( $(echo "$api_out_nodes" | jq -r '.data[].conditions[] | select(.type=="DiskPressure").status' | awk '/True/ {print FNR}' ) )
+  declare -a node_memorypressure=( $(echo "$api_out_nodes" | jq -r '.data[].conditions[] | select(.type=="MemoryPressure").status' | awk '/True/ {print FNR}' ) )
+  declare -a node_kubeletready=( $(echo "$api_out_nodes" | jq -r '.data[].conditions[] | select(.type=="Ready").status' | awk '/False/ {print FNR}' ) )
+  declare -a node_network=( $(echo "$api_out_nodes" | jq -r '.data[].conditions[] | select(.type=="NetworkUnavailable").status' | awk '/True/ {print FNR}' ) )
 
+  # Check node status (user controlled)
   i=0
   for node in ${node_names[*]}
   do
@@ -311,6 +332,35 @@ if [[ -z $clustername ]]; then
   let i++
   done
 
+  # Handle node pressure situations and other conditions (Kubernetes controlled)
+  if [[ ${#node_diskpressure[*]} -gt 0 ]]; then
+    for n in ${node_diskpressure[*]}; do
+      hostid=$(( $n - 1 ))
+      nodeerrors+=("${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} has Disk Pressure -")
+    done
+  fi
+
+  if [[ ${#node_memorypressure[*]} -gt 0 ]]; then
+    for n in ${node_memorypressure[*]}; do
+      hostid=$(( $n - 1 ))
+      nodeerrors+=("${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} has Memory Pressure -")
+    done
+  fi
+
+  if [[ ${#node_kubeletready[*]} -gt 0 ]]; then
+    for n in ${node_kubeletready[*]}; do
+      hostid=$(( $n - 1 ))
+      nodeerrors+=("Kubelet on node ${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} is not ready -")
+    done
+  fi
+
+  if [[ ${#node_network[*]} -gt 0 ]]; then
+    for n in ${node_network[*]}; do
+      hostid=$(( $n - 1 ))
+      nodeerrors+=("Network on node ${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} is unavailable -")
+    done
+  fi
+
   if [[ ${#nodeerrors[*]} -gt 0 ]]; then
     echo "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;;"
     exit ${STATE_CRITICAL}
@@ -324,17 +374,22 @@ if [[ -z $clustername ]]; then
 
 else
 
-# Check status of all nodes in a specific clusters
+# Check status of all nodes in a specific cluster
   api_out_nodes=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/nodes/?clusterId=${clustername}")
+  declare -a node_diskpressure=( $(echo "$api_out_nodes" | jq -r '.data[].conditions[] | select(.type=="DiskPressure").status' | awk '/True/ {print FNR}' ) )
+  declare -a node_memorypressure=( $(echo "$api_out_nodes" | jq -r '.data[].conditions[] | select(.type=="MemoryPressure").status' | awk '/True/ {print FNR}' ) )
+  declare -a node_kubeletready=( $(echo "$api_out_nodes" | jq -r '.data[].conditions[] | select(.type=="Ready").status' | awk '/False/ {print FNR}' ) )
+  declare -a node_network=( $(echo "$api_out_nodes" | jq -r '.data[].conditions[] | select(.type=="NetworkUnavailable").status' | awk '/True/ {print FNR}' ) )
 
   # Check if that given cluster name exists
-  if [[ -n $(echo "$api_out_nodes" | grep -i "error") ]]
+  if [[ -n $(echo "$api_out_nodes" | grep -i "NotFound") ]]
     then echo "CHECK_RANCHER2 CRITICAL - Cluster $clustername not found. Hint: Use '-t info' to identify cluster and project names."; exit ${STATE_CRITICAL}
   fi
 
   declare -a node_names=( $(echo "$api_out_nodes" | jq -r '.data[].nodeName') )
   declare -a node_status=( $(echo "$api_out_nodes" | jq -r '.data[].state') )
 
+  # Check node status (user controlled)
   i=0
   for node in ${node_names[*]}
   do
@@ -351,6 +406,45 @@ else
   let i++
   done
 
+  # Handle node pressure situations and other conditions (Kubernetes controlled)
+  if [[ ${#node_diskpressure[*]} -gt 0 ]]; then
+    for n in ${node_diskpressure[*]}; do
+      hostid=$(( $n - 1 ))
+      nodeerrors+=("${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} has Disk Pressure -")
+    done
+  fi
+
+  if [[ ${#node_memorypressure[*]} -gt 0 ]]; then
+    for n in ${node_memorypressure[*]}; do
+      hostid=$(( $n - 1 ))
+      nodeerrors+=("${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} has Memory Pressure -")
+    done
+  fi
+
+  if [[ ${#node_kubeletready[*]} -gt 0 ]]; then
+    for n in ${node_kubeletready[*]}; do
+      hostid=$(( $n - 1 ))
+      nodeerrors+=("Kubelet on node ${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} is not ready -")
+    done
+  fi
+
+  if [[ ${#node_network[*]} -gt 0 ]]; then
+    for n in ${node_network[*]}; do
+      hostid=$(( $n - 1 ))
+      nodeerrors+=("Network on node ${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} is unavailable -")
+    done
+  fi
+
+  if [[ ${#nodeerrors[*]} -gt 0 ]]; then
+    echo "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;;"
+    exit ${STATE_CRITICAL}
+  elif [[ ${#nodeignored[*]} -gt 0 ]]; then
+    echo "CHECK_RANCHER2 OK - All nodes OK - Info: ${nodeignored[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;;"
+    exit ${STATE_OK}
+  else
+    echo "CHECK_RANCHER2 OK - All ${#node_names[*]} nodes are active|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;;"
+    exit ${STATE_OK}
+  fi
   if [[ ${#nodeerrors[*]} -gt 0 ]]; then
     echo "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;;"
     exit ${STATE_CRITICAL}
@@ -396,17 +490,17 @@ if [[ -z $projectname ]]; then
   fi
 
 else
-
+ 
 # Check status of a single project
   api_out_single_project=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}")
 
   # Check if that given project name exists
-  if [[ -n $(echo "$api_out_single_project" | grep -i "error") ]]
+  if [[ -n $(echo "$api_out_single_project" | grep -i "NotFound") ]]
     then echo "CHECK_RANCHER2 CRITICAL - Project $projectname not found. Hint: Use '-t info' to identify cluster and project names."; exit ${STATE_CRITICAL}
   fi
 
   healthstatus=$(echo "$api_out_single_project" | jq -r '.state')
-
+  
   if [[ ${healthstatus} != active ]]
   then
     echo "CHECK_RANCHER2 CRITICAL - Project $projectname is not active|'project_active'=0;;;; 'project_error'=1;;;;"
@@ -415,8 +509,7 @@ else
     echo "CHECK_RANCHER2 OK - Project $projectname is active|'project_active'=1;;;; 'project_error'=0;;;;"
     exit ${STATE_OK}
   fi
-
-
+  
 fi
 ;;
 
@@ -443,7 +536,7 @@ if [[ -z $workloadname ]]; then
   if [[ ${#workload_names} -eq 0 ]]; then
     echo "CHECK_RANCHER2 WARNING - No workloads found in project ${projectname}."; exit ${STATE_WARNING}
   fi
-
+ 
   i=0
   for workload in ${workload_names[*]}
   do
@@ -481,7 +574,7 @@ if [[ -z $workloadname ]]; then
   fi
 
 else
-
+ 
 # Check status of a single workload
   if [[ -n $namespacename && $namespacename != "" ]]; then
     nsappend="&namespaceId=$namespacename"
@@ -507,7 +600,7 @@ else
   fi
 
   healthstatus=$(echo "$api_out_single_workload" | jq -r '.data[].state')
-
+  
   if [[ ${healthstatus} = updating ]]
   then
     echo "CHECK_RANCHER2 WARNING - Workload $workloadname is ${healthstatus}|'workload_active'=0;;;; 'workload_error'=0;;;; 'workload_warning'=1;;;;"
@@ -520,7 +613,7 @@ else
     echo "CHECK_RANCHER2 OK - Workload $workloadname is active|'workload_active'=1;;;; 'workload_error'=0;;;; 'workload_warning'=0;;;;"
     exit ${STATE_OK}
   fi
-
+  
 fi
 ;;
 
@@ -604,4 +697,3 @@ fi
 esac
 echo "UNKNOWN: should never reach this part"
 exit ${STATE_UNKNOWN}
-
