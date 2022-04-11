@@ -66,55 +66,67 @@ do
  exit ${STATE_UNKNOWN}
  fi
 done
+
 #########################################################################
 # We all need help from time to time
-help="check_rancher2 v ${version} (c) 2018-2021 Claudio Kuenzler and contributers (published under GPLv2)\n
-Usage: $0 -H Rancher2Address -U user-token -P password [-S] -t checktype [-c cluster] [-p project] [-w workload]\n
-\nOptions:\n
-\t-H Address of Rancher 2 API (e.g. rancher.example.com)\n
-\t-U API username (Access Key)\n
-\t-P API password (Secret Key)\n
-\t-S Use https instead of http\n
-\t-s Allow self-signed certificates\n
-\t-t Check type (see list below for available check types)\n
-\t-c Cluster name (for specific cluster check)\n
-\t-p Project name (for specific project check, needed for workload checks)\n
-\t-n Namespace name (needed for specific workload or pod checks)\n
-\t-w Workload name (for specific workload check)\n
-\t-o Pod name (for specific pod check, this makes only sense if you use static pods)\n
-\t-i Comma-separated list of status(es) to ignore (currently only supported in node check type)\n
-\t-h Help. I need somebody. Help. Not just anybody. Heeeeeelp!\n
-\nCheck Types:\n
-\tinfo -> Informs about available clusters and projects and their API ID's. These ID's are needed for specific checks.\n
-\tcluster -> Checks the current status of all clusters or of a specific cluster (defined with -c clusterid)\n
-\tnode -> Checks the current status of nodes in all clusters or of nodes in a specific cluster (defined with -c clusterid)\n
-\tproject -> Checks the current status of all projects or of a specific project (defined with -p projectid)\n
-\tworkload -> Checks the current status of all or a specific (-w workloadname) workload within a project (-p projectid must be set!)\n
-\tpod -> Checks the current status of all or a specific (-o podname -n namespace) pod within a project (-p projectid must be set!)\n
-\n"
+usage () {
+printf "check_rancher2 v ${version} (c) 2018-2021 Claudio Kuenzler and contributers (published under GPLv2)
+Usage: $0 -H Rancher2Address -U user-token -P password [-S] -t checktype [-c cluster] [-p project] [-w workload]
 
-if [ "${1}" = "--help" -o "${#}" = "0" ];
-       then echo -e ${help}; exit 1;
+Options:
+\t[ -H | --apihost ] Address of Rancher 2 API (e.g. rancher.example.com)
+\t[ -U | --apiuser ] API username (Access Key)
+\t[ -P | --apipass ] API password (Secret Key)
+\t[ -S | --secure  ] Use https instead of http
+\t[ -s | --selfsigned ] Allow self-signed certificates
+\t[ -t | --type ] Check type (see list below for available check types)
+\t[ -c | --clustername ] Cluster name (for specific cluster check)
+\t[ -p | --projectname ] Project name (for specific project check, needed for workload checks)
+\t[ -n | --namespacename ] Namespace name (needed for specific workload or pod checks)
+\t[ -w | --workloadname ] Workload name (for specific workload check)
+\t[ -o | --podname ] Pod name (for specific pod check, this makes only sense if you use static pods)
+\t[ -i | --ignore ] Comma-separated list of status(es) to ignore (currently only supported in node check type)
+\t[ -h | --help ] Help. I need somebody. Help. Not just anybody. Heeeeeelp!
+
+Check Types:
+\tinfo -> Informs about available clusters and projects and their API ID's. These ID's are needed for specific checks.
+\tcluster -> Checks the current status of all clusters or of a specific cluster (defined with -c clusterid)
+\tnode -> Checks the current status of nodes in all clusters or of nodes in a specific cluster (defined with -c clusterid)
+\tproject -> Checks the current status of all projects or of a specific project (defined with -p projectid)
+\tworkload -> Checks the current status of all or a specific (-w workloadname) workload within a project (-p projectid must be set!)
+\tpod -> Checks the current status of all or a specific (-o podname -n namespace) pod within a project (-p projectid must be set!)
+"
+exit ${STATE_UNKNOWN}
+}
+
+PARSED_ARGUMENTS=$(getopt -a -n check_rancher2 -o H:U:P:t:c:p:n:w:o:Ssi:h --long apihost:,apiuser:,apipass:,type:,clustername:,projectname:,namespacename:,workloadname:,podname:,secure,selfsigned,ignore: -- "$@")
+VALID_ARGUMENTS=$?
+if [ "$VALID_ARGUMENTS" != "0" ]; then
+  usage
 fi
+
 #########################################################################
 # Get user-given variables
-while getopts "H:U:P:t:c:p:n:w:o:Ssi:h" Input;
+eval set -- "$PARSED_ARGUMENTS"
+while :
 do
-  case ${Input} in
-  H)      apihost=${OPTARG};;
-  U)      apiuser=${OPTARG};;
-  P)      apipass=${OPTARG};;
-  t)      type=${OPTARG};;
-  c)      clustername=${OPTARG};;
-  p)      projectname=${OPTARG};;
-  n)      namespacename=${OPTARG};;
-  w)      workloadname=${OPTARG};;
-  o)      podname=${OPTARG};;
-  S)      proto=https;;
-  s)      selfsigned="-k";;
-  i)      ignore=${OPTARG};;
-  h)      echo -e ${help}; exit ${STATE_UNKNOWN};;
-  *)      echo -e ${help}; exit ${STATE_UNKNOWN};;
+  case "$1" in
+  -H | --apihost)       apihost=${2}       ; shift 2 ;;
+  -U | --apiuser)       apiuser=${2}       ; shift 2 ;;
+  -P | --apipass)       apipass=${2}       ; shift 2 ;;
+  -t | --type)          type=${2}          ; shift 2 ;;
+  -c | --clustername)   clustername=${2}   ; shift 2 ;;
+  -p | --projectname)   projectname=${2}   ; shift 2 ;;
+  -n | --namespacename) namespacename=${2} ; shift 2 ;;
+  -w | --workloadname)  workloadname=${2}  ; shift 2 ;;
+  -o | --podname)       podname=${2}       ; shift 2 ;;
+  -S | --secure)        proto=https        ; shift ;;
+  -s | --selfsigned)    selfsigned="-k"    ; shift ;;
+  -i | --ignore)        ignore=${2}        ; shift 2 ;;
+  --)                   shift; break ;;
+  -h | --help)          usage;;
+  *)      echo "Unexpected option: $1 - this should not happen."
+	  usage;;
   esac
 done
 #########################################################################
@@ -266,9 +278,10 @@ else
   # convert capacity_memory dependened by unit
   # get unit
   declare -a capacity_memory_unit=( $(echo "${capacity_memory}" | sed 's/^[0-9]*//g') )
+  declare -a capacity_memory_count=( $(echo "${capacity_memory}" | sed 's/[a-zA-Z]*$//g') )
+
   if [[ $capacity_memory_unit == "Ki" ]]
   then
-    declare -a capacity_memory_count=( $(echo "${capacity_memory}" | sed 's/[a-zA-Z]*$//g') )
     capacity_memory=$(( ${capacity_memory_count} * 1024 ))
   fi
 
