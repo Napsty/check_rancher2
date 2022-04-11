@@ -315,6 +315,17 @@ if [[ -z $clustername ]]; then
   declare -a node_kubeletready=( $(echo "$api_out_nodes" | jq -r '.data[].conditions[] | select(.type=="Ready").status' | awk '/False/ {print FNR}' ) )
   declare -a node_network=( $(echo "$api_out_nodes" | jq -r '.data[].conditions[] | select(.type=="NetworkUnavailable").status' | awk '/True/ {print FNR}' ) )
 
+  # node capacity
+  declare -a node_capacity_cpu=( $(echo "$api_out_nodes" | jq -r '.data[].capacity.cpu' ) )
+  declare -a node_capacity_memory=( $(echo "$api_out_nodes" | jq -r '.data[].capacity.memory' ) )
+  declare -a node_capacity_pods=( $(echo "$api_out_nodes" | jq -r '.data[].capacity.pods' ) )
+
+  # node requested
+  declare -a node_requested_cpu=( $(echo "$api_out_nodes" | jq -r '.data[].requested.cpu' ) )
+  declare -a node_requested_memory=( $(echo "$api_out_nodes" | jq -r '.data[].requested.memory' ) )
+  declare -a node_requested_pods=( $(echo "$api_out_nodes" | jq -r '.data[].requested.pods' ) )
+
+
   # Check node status (user controlled)
   i=0
   for node in ${node_names[*]}
@@ -361,14 +372,92 @@ if [[ -z $clustername ]]; then
     done
   fi
 
+  # calculate total capacities
+  nodes_capacity_cpu_total=0
+  for capacity_cpu in ${node_capacity_cpu[@]}; do
+    capacity_cpu_unit=( $(echo "${capacity_cpu}" | sed 's/^[0-9]*//g') )
+    capacity_cpu_count=( $(echo "${capacity_cpu}" | sed 's/[a-zA-Z]*$//g') )
+
+    if [[ $capacity_cpu_unit == "" ]]
+    then
+      capacity_cpu=$(( ${capacity_cpu_count} * 1000 ))
+    elif [[ $capacity_cpu_unit == "m" ]]
+    then
+      capacity_cpu=${capacity_cpu_count}
+    fi
+
+    let nodes_capacity_cpu_total+=$capacity_cpu
+  done
+
+  nodes_capacity_memory_total=0
+  for capacity_memory in ${node_capacity_memory[@]}; do
+    capacity_memory_unit=( $(echo "${capacity_memory}" | sed 's/^[0-9]*//g') )
+    capacity_memory_count=( $(echo "${capacity_memory}" | sed 's/[a-zA-Z]*$//g') )
+
+    if [[ $capacity_memory_unit == "Mi" ]]
+    then
+      capacity_memory_count=( $(echo "${capacity_memory}" | sed 's/[a-zA-Z]*$//g') )
+      capacity_memory=$(( ${capacity_memory_count} * 1024 ))
+    elif [[ $capacity_memory_unit == "Ki" ]]
+    then
+      capacity_memory=${capacity_memory_count}
+    fi
+
+    let nodes_capacity_memory_total+=$capacity_memory
+  done
+
+  nodes_capacity_pods_total=0
+  for capacity_pods in ${node_capacity_pods[@]}; do
+    let nodes_capacity_pods_total+=$capacity_pods
+  done
+
+  # calculate total requested
+  nodes_requested_cpu_total=0
+  for requested_cpu in ${node_requested_cpu[@]}; do
+    requested_cpu_unit=( $(echo "${requested_cpu}" | sed 's/^[0-9]*//g') )
+    requested_cpu_count=( $(echo "${requested_cpu}" | sed 's/[a-zA-Z]*$//g') )
+
+    if [[ $requested_cpu_unit == "" ]]
+    then
+      requested_cpu=$(( ${requested_cpu_count} * 1000 ))
+    elif [[ $requested_cpu_unit == "m" ]]
+    then
+      requested_cpu=${requested_cpu_count}
+    fi
+
+    let nodes_requested_cpu_total+=$requested_cpu
+  done
+
+  nodes_requested_memory_total=0
+  for requested_memory in ${node_requested_memory[@]}; do
+    requested_memory_unit=( $(echo "${requested_memory}" | sed 's/^[0-9]*//g') )
+    requested_memory_count=( $(echo "${requested_memory}" | sed 's/[a-zA-Z]*$//g') )
+
+    if [[ $requested_memory_unit == "Mi" ]]
+    then
+      requested_memory=$(( ${requested_memory_count} * 1024 ))
+    elif [[ $requested_memory_unit == "Ki" ]]
+    then
+      requested_memory=${requested_memory_count}
+    fi
+
+    let nodes_requested_memory_total+=$requested_memory
+  done
+
+  nodes_requested_pods_total=0
+  for requested_pods in ${node_requested_pods[@]}; do
+    let nodes_requested_pods_total+=$requested_pods
+  done
+
+
   if [[ ${#nodeerrors[*]} -gt 0 ]]; then
-    echo "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;;"
+    echo "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_capacity_cpu_total'=${nodes_capacity_cpu_total}m;;;; 'nodes_capacity_mem_total'=${nodes_capacity_memory_total}Ki;;;; 'nodes_capacity_pod_total'=${nodes_capacity_pods_total};;;; 'nodes_requested_cpu_total'=${nodes_requested_cpu_total}m;;;; 'nodes_requested_mem_total'=${nodes_requested_memory_total}Ki;;;; 'nodes_requested_pod_total'=${nodes_requested_pods_total};;;;"
     exit ${STATE_CRITICAL}
   elif [[ ${#nodeignored[*]} -gt 0 ]]; then
-    echo "CHECK_RANCHER2 OK - All nodes OK - Info: ${nodeignored[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;;"
+    echo "CHECK_RANCHER2 OK - All nodes OK - Info: ${nodeignored[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_capacity_cpu_total'=${nodes_capacity_cpu_total}m;;;; 'nodes_capacity_mem_total'=${nodes_capacity_memory_total}Ki;;;; 'nodes_capacity_pod_total'=${nodes_capacity_pods_total};;;; 'nodes_requested_cpu_total'=${nodes_requested_cpu_total}m;;;; 'nodes_requested_mem_total'=${nodes_requested_memory_total}Ki;;;; 'nodes_requested_pod_total'=${nodes_requested_pods_total};;;;"
     exit ${STATE_OK}
   else
-    echo "CHECK_RANCHER2 OK - All ${#node_names[*]} nodes are active|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;;"
+    echo "CHECK_RANCHER2 OK - All ${#node_names[*]} nodes are active|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_capacity_cpu_total'=${nodes_capacity_cpu_total}m;;;; 'nodes_capacity_mem_total'=${nodes_capacity_memory_total}Ki;;;; 'nodes_capacity_pod_total'=${nodes_capacity_pods_total};;;; 'nodes_requested_cpu_total'=${nodes_requested_cpu_total}m;;;; 'nodes_requested_mem_total'=${nodes_requested_memory_total}Ki;;;; 'nodes_requested_pod_total'=${nodes_requested_pods_total};;;;"
     exit ${STATE_OK}
   fi
 
@@ -380,6 +469,16 @@ else
   declare -a node_memorypressure=( $(echo "$api_out_nodes" | jq -r '.data[].conditions[] | select(.type=="MemoryPressure").status' | awk '/True/ {print FNR}' ) )
   declare -a node_kubeletready=( $(echo "$api_out_nodes" | jq -r '.data[].conditions[] | select(.type=="Ready").status' | awk '/False/ {print FNR}' ) )
   declare -a node_network=( $(echo "$api_out_nodes" | jq -r '.data[].conditions[] | select(.type=="NetworkUnavailable").status' | awk '/True/ {print FNR}' ) )
+
+  # node capacity
+  declare -a node_capacity_cpu=( $(echo "$api_out_nodes" | jq -r '.data[].capacity.cpu' ) )
+  declare -a node_capacity_memory=( $(echo "$api_out_nodes" | jq -r '.data[].capacity.memory' ) )
+  declare -a node_capacity_pods=( $(echo "$api_out_nodes" | jq -r '.data[].capacity.pods' ) )
+
+  # node requested
+  declare -a node_requested_cpu=( $(echo "$api_out_nodes" | jq -r '.data[].requested.cpu' ) )
+  declare -a node_requested_memory=( $(echo "$api_out_nodes" | jq -r '.data[].requested.memory' ) )
+  declare -a node_requested_pods=( $(echo "$api_out_nodes" | jq -r '.data[].requested.pods' ) )
 
   # Check if that given cluster name exists
   if [[ -n $(echo "$api_out_nodes" | grep -i "NotFound") ]]
@@ -435,24 +534,103 @@ else
     done
   fi
 
+  # calculate total capacities
+  nodes_capacity_cpu_total=0
+  for capacity_cpu in ${node_capacity_cpu[@]}; do
+    capacity_cpu_unit=( $(echo "${capacity_cpu}" | sed 's/^[0-9]*//g') )
+    capacity_cpu_count=( $(echo "${capacity_cpu}" | sed 's/[a-zA-Z]*$//g') )
+
+    if [[ $capacity_cpu_unit == "" ]]
+    then
+      capacity_cpu=$(( ${capacity_cpu_count} * 1000 ))
+    elif [[ $capacity_cpu_unit == "m" ]]
+    then
+      capacity_cpu=${capacity_cpu_count}
+    fi
+
+    let nodes_capacity_cpu_total+=$capacity_cpu
+  done
+
+  nodes_capacity_memory_total=0
+  for capacity_memory in ${node_capacity_memory[@]}; do
+    capacity_memory_unit=( $(echo "${capacity_memory}" | sed 's/^[0-9]*//g') )
+    capacity_memory_count=( $(echo "${capacity_memory}" | sed 's/[a-zA-Z]*$//g') )
+
+    if [[ $capacity_memory_unit == "Mi" ]]
+    then
+      capacity_memory_count=( $(echo "${capacity_memory}" | sed 's/[a-zA-Z]*$//g') )
+      capacity_memory=$(( ${capacity_memory_count} * 1024 ))
+    elif [[ $capacity_memory_unit == "Ki" ]]
+    then
+      capacity_memory=${capacity_memory_count}
+    fi
+
+    let nodes_capacity_memory_total+=$capacity_memory
+  done
+
+  nodes_capacity_pods_total=0
+  for capacity_pods in ${node_capacity_pods[@]}; do
+    let nodes_capacity_pods_total+=$capacity_pods
+  done
+
+
+  # calculate total requested
+  nodes_requested_cpu_total=0
+  for requested_cpu in ${node_requested_cpu[@]}; do
+    requested_cpu_unit=( $(echo "${requested_cpu}" | sed 's/^[0-9]*//g') )
+    requested_cpu_count=( $(echo "${requested_cpu}" | sed 's/[a-zA-Z]*$//g') )
+
+    if [[ $requested_cpu_unit == "" ]]
+    then
+      requested_cpu=$(( ${requested_cpu_count} * 1000 ))
+    elif [[ $requested_cpu_unit == "m" ]]
+    then
+      requested_cpu=${requested_cpu_count}
+    fi
+
+    let nodes_requested_cpu_total+=$requested_cpu
+  done
+
+  nodes_requested_memory_total=0
+  for requested_memory in ${node_requested_memory[@]}; do
+    requested_memory_unit=( $(echo "${requested_memory}" | sed 's/^[0-9]*//g') )
+    requested_memory_count=( $(echo "${requested_memory}" | sed 's/[a-zA-Z]*$//g') )
+
+    if [[ $requested_memory_unit == "Mi" ]]
+    then
+      requested_memory=$(( ${requested_memory_count} * 1024 ))
+    elif [[ $requested_memory_unit == "Ki" ]]
+    then
+      requested_memory=${requested_memory_count}
+    fi
+
+    let nodes_requested_memory_total+=$requested_memory
+  done
+
+  nodes_requested_pods_total=0
+  for requested_pods in ${node_requested_pods[@]}; do
+    let nodes_requested_pods_total+=$requested_pods
+  done
+
+
   if [[ ${#nodeerrors[*]} -gt 0 ]]; then
-    echo "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;;"
+    echo "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_capacity_cpu_total'=${nodes_capacity_cpu_total}m;;;; 'nodes_capacity_mem_total'=${nodes_capacity_memory_total}Ki;;;; 'nodes_capacity_pod_total'=${nodes_capacity_pods_total};;;; 'nodes_requested_cpu_total'=${nodes_requested_cpu_total}m;;;; 'nodes_requested_mem_total'=${nodes_requested_memory_total}Ki;;;; 'nodes_requested_pod_total'=${nodes_requested_pods_total};;;;"
     exit ${STATE_CRITICAL}
   elif [[ ${#nodeignored[*]} -gt 0 ]]; then
-    echo "CHECK_RANCHER2 OK - All nodes OK - Info: ${nodeignored[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;;"
+    echo "CHECK_RANCHER2 OK - All nodes OK - Info: ${nodeignored[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_capacity_cpu_total'=${nodes_capacity_cpu_total}m;;;; 'nodes_capacity_mem_total'=${nodes_capacity_memory_total}Ki;;;; 'nodes_capacity_pod_total'=${nodes_capacity_pods_total};;;; 'nodes_requested_cpu_total'=${nodes_requested_cpu_total}m;;;; 'nodes_requested_mem_total'=${nodes_requested_memory_total}Ki;;;; 'nodes_requested_pod_total'=${nodes_requested_pods_total};;;;"
     exit ${STATE_OK}
   else
-    echo "CHECK_RANCHER2 OK - All ${#node_names[*]} nodes are active|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;;"
+    echo "CHECK_RANCHER2 OK - All ${#node_names[*]} nodes are active|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_capacity_cpu_total'=${nodes_capacity_cpu_total}m;;;; 'nodes_capacity_mem_total'=${nodes_capacity_memory_total}Ki;;;; 'nodes_capacity_pod_total'=${nodes_capacity_pods_total};;;; 'nodes_requested_cpu_total'=${nodes_requested_cpu_total}m;;;; 'nodes_requested_mem_total'=${nodes_requested_memory_total}Ki;;;; 'nodes_requested_pod_total'=${nodes_requested_pods_total};;;;"
     exit ${STATE_OK}
   fi
   if [[ ${#nodeerrors[*]} -gt 0 ]]; then
-    echo "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;;"
+    echo "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_capacity_cpu_total'=${nodes_capacity_cpu_total}m;;;; 'nodes_capacity_mem_total'=${nodes_capacity_memory_total}Ki;;;; 'nodes_capacity_pod_total'=${nodes_capacity_pods_total};;;; 'nodes_requested_cpu_total'=${nodes_requested_cpu_total}m;;;; 'nodes_requested_mem_total'=${nodes_requested_memory_total}Ki;;;; 'nodes_requested_pod_total'=${nodes_requested_pods_total};;;;"
     exit ${STATE_CRITICAL}
   elif [[ ${#nodeignored[*]} -gt 0 ]]; then
-    echo "CHECK_RANCHER2 OK - All nodes OK - Info: ${nodeignored[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;;"
+    echo "CHECK_RANCHER2 OK - All nodes OK - Info: ${nodeignored[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_capacity_cpu_total'=${nodes_capacity_cpu_total}m;;;; 'nodes_capacity_mem_total'=${nodes_capacity_memory_total}Ki;;;; 'nodes_capacity_pod_total'=${nodes_capacity_pods_total};;;; 'nodes_requested_cpu_total'=${nodes_requested_cpu_total}m;;;; 'nodes_requested_mem_total'=${nodes_requested_memory_total}Ki;;;; 'nodes_requested_pod_total'=${nodes_requested_pods_total};;;;"
     exit ${STATE_OK}
   else
-    echo "CHECK_RANCHER2 OK - All ${#node_names[*]} nodes are active|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;;"
+    echo "CHECK_RANCHER2 OK - All ${#node_names[*]} nodes are active|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_capacity_cpu_total'=${nodes_capacity_cpu_total}m;;;; 'nodes_capacity_mem_total'=${nodes_capacity_memory_total}Ki;;;; 'nodes_capacity_pod_total'=${nodes_capacity_pods_total};;;; 'nodes_requested_cpu_total'=${nodes_requested_cpu_total}m;;;; 'nodes_requested_mem_total'=${nodes_requested_memory_total}Ki;;;; 'nodes_requested_pod_total'=${nodes_requested_pods_total};;;;"
     exit ${STATE_OK}
   fi
 
