@@ -372,7 +372,7 @@ else
     exit ${STATE_CRITICAL}
   elif [[ ${#componenterrors[*]} -gt 0 ]] && [[ ! -z ${resourceerrors} ]]
   then
-    printf "CHECK_RANCHER2 CRITICAL - Cluster $clusteralias has resource problems and component errors|'cluster_healthy'=0;;;; ${perf_output}\n${resourceerrors}\n${componenterrors[*]}"
+    printf "CHECK_RANCHER2 CRITICAL - Cluster $clusteralias has resource problems and component errors|'cluster_healthy'=0;;;; ${perf_output}\n${resourceerrors} ${componenterrors[*]}"
     exit ${STATE_CRITICAL}
   else
     printf "CHECK_RANCHER2 OK - Cluster $clusteralias is healthy|'cluster_healthy'=1;;;; ${perf_output}"
@@ -477,7 +477,6 @@ if [[ -z $clustername ]]; then
 
     if [[ $capacity_memory_unit == "Mi" ]]
     then
-      capacity_memory_count=( $(echo "${capacity_memory}" | sed 's/[a-zA-Z]*$//g') )
       capacity_memory=$(( ${capacity_memory_count} * 1024 ))
     elif [[ $capacity_memory_unit == "Ki" ]]
     then
@@ -585,6 +584,64 @@ else
     done
   let i++
   done
+    
+  # check capacities per node 
+  i=0
+  for node in ${node_names[*]}
+  do
+    node_capacity_cpu_unit=( $(echo "${node_capacity_cpu[$i]}" | sed 's/^[0-9]*//g') )
+    node_capacity_cpu_count=( $(echo "${node_capacity_cpu[$i]}" | sed 's/[a-zA-Z]*$//g') )
+
+    if [[ $node_capacity_cpu_unit == "" ]]
+    then
+      capacity_cpu=$(( ${node_capacity_cpu_count} * 1000 ))
+    elif [[ $node_capacity_cpu_unit == "m" ]]
+    then
+      capacity_cpu=${node_capacity_cpu_count}
+    fi
+
+    node_capacity_memory_unit=( $(echo "${node_capacity_memory[$i]}" | sed 's/^[0-9]*//g') )
+    node_capacity_memory_count=( $(echo "${node_capacity_memory[$i]}" | sed 's/[a-zA-Z]*$//g') )
+
+    if [[ $node_capacity_memory_unit == "Mi" ]]
+    then
+      capacity_memory=$(( ${node_capacity_memory_count} * 1024 * 1024 ))
+    elif [[ $node_capacity_memory_unit == "Ki" ]]
+    then
+      capacity_memory=$(( ${node_capacity_memory_count} * 1024 ))
+    elif [[ $node_capacity_memory_unit == "" ]]
+    then
+      capacity_memory=${node_capacity_memory_count}
+    fi
+
+    node_requested_cpu_unit=( $(echo "${node_requested_cpu[$i]}" | sed 's/^[0-9]*//g') )
+    node_requested_cpu_count=( $(echo "${node_requested_cpu[$i]}" | sed 's/[a-zA-Z]*$//g') )
+
+    if [[ $node_requested_cpu_unit == "" ]]
+    then
+      requested_cpu=$(( ${node_requested_cpu_count} * 1000 ))
+    elif [[ $node_requested_cpu_unit == "m" ]]
+    then
+      requested_cpu=${node_requested_cpu_count}
+    fi
+
+    node_requested_memory_unit=( $(echo "${node_requested_memory[$i]}" | sed 's/^[0-9]*//g') )
+    node_requested_memory_count=( $(echo "${node_requested_memory[$i]}" | sed 's/[a-zA-Z]*$//g') )
+
+    if [[ $node_requested_memory_unit == "Mi" ]]
+    then
+      requested_memory=$(( ${node_requested_memory_count} * 1024 * 1024 ))
+    elif [[ $node_requested_memory_unit == "Ki" ]]
+    then
+      requested_memory=$(( ${node_requested_memory_count} * 1024 ))
+    elif [[ $node_requested_memory_unit == "" ]]
+    then
+      requested_memory=${node_requested_memory_count}
+    fi
+
+    printf "Node: ${node} - capacity_cpu=${capacity_cpu} capacity_memory=${capacity_memory} capacity_pods=${node_capacity_pods[$i]} requested_cpu=${requested_cpu} requested_memory=${requested_memory} requested_pods=${node_requested_pods[$i]} \n"
+  let i++
+  done
 
   # Handle node pressure situations and other conditions (Kubernetes controlled)
   if [[ ${#node_diskpressure[*]} -gt 0 ]]; then
@@ -639,7 +696,6 @@ else
 
     if [[ $capacity_memory_unit == "Mi" ]]
     then
-      capacity_memory_count=( $(echo "${capacity_memory}" | sed 's/[a-zA-Z]*$//g') )
       capacity_memory=$(( ${capacity_memory_count} * 1024 ))
     elif [[ $capacity_memory_unit == "Ki" ]]
     then
