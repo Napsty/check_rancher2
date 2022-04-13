@@ -86,7 +86,13 @@ Options:
 \t[ -w | --workloadname ] Workload name (for specific workload check)
 \t[ -o | --podname ] Pod name (for specific pod check, this makes only sense if you use static pods)
 \t[ -i | --ignore ] Comma-separated list of status(es) to ignore (currently only supported in node check type)
-\t[ -h | --help ] Help. I need somebody. Help. Not just anybody. Heeeeeelp!
+\t[ --cpu-warn ] Exit with WARNING status if more than PERCENT of cpu capacity is used (currently only supported in node and single cluster check type)
+\t[ --cpu-crit ] Exit with CRITICAL status if more than PERCENT of cpu capacity is used (currently only supported in node and single cluster check type)
+\t[ --mem-warn ] Exit with WARNING status if more than PERCENT of mem capacity is used (currently only supported in node and single cluster check type)
+\t[ --mem-crit ] Exit with CRITICAL status if more than PERCENT of mem capacity is used (currently only supported in node and single cluster check type)
+\t[ --pods-warn ] Exit with WARNING status if more than PERCENT of pod capacity is used (currently only supported in node and single cluster check type)
+\t[ --pods-crit ] Exit with CRITICAL status if more than PERCENT of pod capacity is used (currently only supported in node and single cluster check type)
+\t[ -h  | --help ] Help. I need somebody. Help. Not just anybody. Heeeeeelp!
 
 Check Types:
 \tinfo -> Informs about available clusters and projects and their API ID's. These ID's are needed for specific checks.
@@ -99,7 +105,7 @@ Check Types:
 exit ${STATE_UNKNOWN}
 }
 
-PARSED_ARGUMENTS=$(getopt -a -n check_rancher2 -o H:U:P:t:c:p:n:w:o:Ssi:h --long apihost:,apiuser:,apipass:,type:,clustername:,projectname:,namespacename:,workloadname:,podname:,secure,selfsigned,ignore: -- "$@")
+PARSED_ARGUMENTS=$(getopt -a -n check_rancher2 -o H:U:P:t:c:p:n:w:o:Ssi:h --long apihost:,apiuser:,apipass:,type:,clustername:,projectname:,namespacename:,workloadname:,podname:,secure,selfsigned,ignore:,cpu-warn:,cpu-crit:,memory-warn:,memory-crit:,pods-warn:,pods-crit: -- "$@")
 VALID_ARGUMENTS=$?
 if [ "$VALID_ARGUMENTS" != "0" ]; then
   usage
@@ -123,6 +129,12 @@ do
   -S | --secure)        proto=https        ; shift ;;
   -s | --selfsigned)    selfsigned="-k"    ; shift ;;
   -i | --ignore)        ignore=${2}        ; shift 2 ;;
+  --cpu-warn)           cpu_warn=${2}      ; shift 2 ;;
+  --cpu-crit)           cpu_crit=${2}      ; shift 2 ;;
+  --memory-warn)        memory_warn=${2}   ; shift 2 ;;
+  --memory-crit)        memory_crit=${2}   ; shift 2 ;;
+  --pods-warn)          pods_warn=${2}     ; shift 2 ;;
+  --pods-crit)          pods_crit=${2}     ; shift 2 ;;
   --)                   shift; break ;;
   -h | --help)          usage;;
   *)      echo "Unexpected option: $1 - this should not happen."
@@ -135,6 +147,9 @@ if [ -z $apihost ]; then echo -e "CHECK_RANCHER2 UNKNOWN - Missing Rancher 2.x A
 if [ -z $apiuser ]; then echo -e "CHECK_RANCHER2 UNKNOWN - Missing API user"; exit ${STATE_UNKNOWN}; fi
 if [ -z $apipass ]; then echo -e "CHECK_RANCHER2 UNKNOWN - Missing API password"; exit ${STATE_UNKNOWN}; fi
 if [ -z $type ]; then echo -e "CHECK_RANCHER2 UNKNOWN - Missing check type"; exit ${STATE_UNKNOWN}; fi
+if [[ "$cpu_warn" -gt "$cpu_crit" ]]; then echo -e "CHECK_RANCHER2 UNKNOWN - cpu-warn should be lower than cpu-crit"; exit ${STATE_UNKNOWN}; fi
+if [[ "$memory_warn" -gt "$memory_crit" ]]; then echo -e "CHECK_RANCHER2 UNKNOWN - memory-warn should be lower than memory-crit"; exit ${STATE_UNKNOWN}; fi
+if [[ "$pods_warn" -gt "$pods_crit" ]]; then echo -e "CHECK_RANCHER2 UNKNOWN - pods-warn should be lower than pods-crit"; exit ${STATE_UNKNOWN}; fi
 #########################################################################
 # Base communication check
 apicheck=$(curl -s ${selfsigned} -o /dev/null -w "%{http_code}" -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project")
@@ -291,7 +306,8 @@ else
   # remove unit from requested_cpu
   requested_cpu=( $(echo "${requested_cpu}" | sed 's/[a-zA-Z]*$//g') )
 
-  if [[ "${clusterstate}" != "active" ]]; then
+  if [[ "${clusterstate}" != "active" ]]
+  then
       componenterrors+="cluster ${clusteralias} is in ${clusterstate} state -"
   fi
   
@@ -301,13 +317,65 @@ else
       componenterrors+="${component[$i]} is not healthy -"
     fi
   done
-  
+
+  # usage
+  usage_cpu=$(( 100 * $requested_cpu/$capacity_cpu ))
+  usage_memory=$(( 100 * $requested_memory/$capacity_memory ))
+  usage_pods=$(( 100 * $requested_pods/$capacity_pods ))
+
+  # threshold checks
+  # cpu
+  if [ ! -z $cpu_warn ] || [ ! -z $cpu_crit ]
+  then
+    if [[ "$usage_cpu" -gt "$cpu_crit" ]]
+    then
+      resourceerrors+="CPU usage ${usage_cpu} higher than crit threshold of ${cpu_crit} \n"
+    elif [[ "$usage_cpu" -gt "$cpu_warn" ]]
+    then
+      resourceerrors+="CPU usage ${usage_cpu} higher than warn threshold of ${cpu_warn} \n"
+    fi
+  fi
+
+  # memory
+  if [ ! -z $memory_warn ] || [ ! -z $memory_crit ]
+  then
+    if [[ "$usage_memory" -gt "$memory_crit" ]]
+    then
+      resourceerrors+="MEMORY usage ${usage_memory} higher than crit threshold of ${memory_crit} \n"
+    elif [[ "$usage_memory" -gt "$memory_warn" ]]
+    then
+      resourceerrors+="MEMORY usage ${usage_memory} higher than warn threshold of ${memory_warn} \n"
+    fi
+  fi
+
+  # pods
+  if [ ! -z $pods_warn ] || [ ! -z $pods_crit ]
+  then
+    if [[ "$usage_pods" -gt "$pods_crit" ]]
+    then
+      resourceerrors+="PODS Usage ${usage_pods} higher than crit threshold of ${pods_crit} \n"
+    elif [[ "$usage_pods" -gt "$pods_warn" ]]
+    then
+      resourceerrors+="PODS Usage ${usage_pods} higher than warn threshold of ${pods_warn} \n"
+    fi
+  fi
+
+  perf_output="'component_errors'=${#componenterrors[*]};;;; 'cpu'=${requested_cpu};;;;${capacity_cpu} 'memory'=${requested_memory}B;;;;${capacity_memory} 'pods'=${requested_pods};;;;${capacity_pods} 'usage_cpu'=${usage_cpu};${cpu_warn};${cpu_crit};0;100 'usage_memory'=${usage_memory};${memory_warn};${memory_crit};0;100 'usage_pods'=${usage_pods};${pods_warn};${pods_crit};0;100"
+
   if [[ ${#componenterrors[*]} -gt 0 ]]
   then
-    echo "CHECK_RANCHER2 CRITICAL - Cluster $clusteralias: ${componenterrors[*]}|'cluster_healthy'=0;;;; 'component_errors'=${#componenterrors[*]};;;; 'cpu'=${requested_cpu};;;;${capacity_cpu} 'memory'=${requested_memory}B;;;;${capacity_memory} 'pods'=${requested_pods};;;;${capacity_pods}"
+    printf "CHECK_RANCHER2 CRITICAL - Cluster $clusteralias: ${componenterrors[*]}|'cluster_healthy'=0;;;; ${perf_output}\n${componenterrors[*]}"
+    exit ${STATE_CRITICAL}
+  elif [[ ! -z ${resourceerrors} ]]
+  then
+    printf "CHECK_RANCHER2 CRITICAL - Cluster $clusteralias has resource problems|'cluster_healthy'=0;;;; ${perf_output}\n${resourceerrors}"
+    exit ${STATE_CRITICAL}
+  elif [[ ${#componenterrors[*]} -gt 0 ]] && [[ ! -z ${resourceerrors} ]]
+  then
+    printf "CHECK_RANCHER2 CRITICAL - Cluster $clusteralias has resource problems and component errors|'cluster_healthy'=0;;;; ${perf_output}\n${resourceerrors}\n${componenterrors[*]}"
     exit ${STATE_CRITICAL}
   else
-    echo "CHECK_RANCHER2 OK - Cluster $clusteralias is healthy|'cluster_healthy'=1;;;; 'component_errors'=${#componenterrors[*]};;;; 'cpu'=${requested_cpu};;;;${capacity_cpu} 'memory'=${requested_memory}B;;;;${capacity_memory} 'pods'=${requested_pods};;;;${capacity_pods}" 
+    printf "CHECK_RANCHER2 OK - Cluster $clusteralias is healthy|'cluster_healthy'=1;;;; ${perf_output}"
     exit ${STATE_OK}
   fi
 
