@@ -379,7 +379,7 @@ else
     fi
   fi
 
-  perf_output="'component_errors'=${#componenterrors[*]};;;; 'cpu'=${requested_cpu};;;;${capacity_cpu} 'memory'=${requested_memory};;;;${capacity_memory} 'pods'=${requested_pods};;;;${capacity_pods} 'usage_cpu'=${usage_cpu};${cpu_warn};${cpu_crit};0;100 'usage_memory'=${usage_memory};${memory_warn};${memory_crit};0;100 'usage_pods'=${usage_pods};${pods_warn};${pods_crit};0;100"
+  perf_output="'component_errors'=${#componenterrors[*]};;;; 'cpu'=${requested_cpu};;;;${capacity_cpu} 'memory'=${requested_memory}B;;;0B;${capacity_memory}B 'pods'=${requested_pods};;;;${capacity_pods} 'usage_cpu'=${usage_cpu}%;${cpu_warn}%;${cpu_crit}%;0%;100% 'usage_memory'=${usage_memory}%;${memory_warn}%;${memory_crit}%;0%;100% 'usage_pods'=${usage_pods}%;${pods_warn}%;${pods_crit}%;0%;100%"
 
   if [[ ${#componenterrors[*]} -gt 0 ]]
   then
@@ -496,8 +496,11 @@ if [[ -z $clustername ]]; then
 
     if [[ $capacity_memory_unit == "Mi" ]]
     then
-      capacity_memory=$(( ${capacity_memory_count} * 1024 ))
+      capacity_memory=$(( ${capacity_memory_count} * 1024 * 1024 ))
     elif [[ $capacity_memory_unit == "Ki" ]]
+    then
+      capacity_memory=$(( ${capacity_memory_count} * 1024 ))
+    elif [[ $capacity_memory_unit == "" ]]
     then
       capacity_memory=${capacity_memory_count}
     fi
@@ -534,8 +537,11 @@ if [[ -z $clustername ]]; then
 
     if [[ $requested_memory_unit == "Mi" ]]
     then
-      requested_memory=$(( ${requested_memory_count} * 1024 ))
+      requested_memory=$(( ${requested_memory_count} * 1024 * 1024 ))
     elif [[ $requested_memory_unit == "Ki" ]]
+    then
+      requested_memory=$(( ${requested_memory_count} * 1024 ))
+    elif [[ $requested_memory_unit == "" ]]
     then
       requested_memory=${requested_memory_count}
     fi
@@ -548,15 +554,16 @@ if [[ -z $clustername ]]; then
     let nodes_requested_pods_total+=$requested_pods
   done
 
-
+  perf_output="'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_cpu_total'=${nodes_requested_cpu_total};;;0;${nodes_capacity_cpu_total} 'nodes_memory_total'=${nodes_requested_memory_total}B;;;0B;${nodes_capacity_memory_total}B 'nodes_pods_total'=${nodes_requested_pods_total};;;0;${nodes_capacity_pods_total}"
+  
   if [[ ${#nodeerrors[*]} -gt 0 ]]; then
-    echo "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_capacity_cpu_total'=${nodes_capacity_cpu_total}m;;;; 'nodes_capacity_mem_total'=${nodes_capacity_memory_total}Ki;;;; 'nodes_capacity_pod_total'=${nodes_capacity_pods_total};;;; 'nodes_requested_cpu_total'=${nodes_requested_cpu_total}m;;;; 'nodes_requested_mem_total'=${nodes_requested_memory_total}Ki;;;; 'nodes_requested_pod_total'=${nodes_requested_pods_total};;;;"
+    printf "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|${perf_output}"
     exit ${STATE_CRITICAL}
   elif [[ ${#nodeignored[*]} -gt 0 ]]; then
-    echo "CHECK_RANCHER2 OK - All nodes OK - Info: ${nodeignored[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_capacity_cpu_total'=${nodes_capacity_cpu_total}m;;;; 'nodes_capacity_mem_total'=${nodes_capacity_memory_total}Ki;;;; 'nodes_capacity_pod_total'=${nodes_capacity_pods_total};;;; 'nodes_requested_cpu_total'=${nodes_requested_cpu_total}m;;;; 'nodes_requested_mem_total'=${nodes_requested_memory_total}Ki;;;; 'nodes_requested_pod_total'=${nodes_requested_pods_total};;;;"
+    printf "CHECK_RANCHER2 OK - All nodes OK - Info: ${nodeignored[*]}|${perf_output}"
     exit ${STATE_OK}
   else
-    echo "CHECK_RANCHER2 OK - All ${#node_names[*]} nodes are active|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_capacity_cpu_total'=${nodes_capacity_cpu_total}m;;;; 'nodes_capacity_mem_total'=${nodes_capacity_memory_total}Ki;;;; 'nodes_capacity_pod_total'=${nodes_capacity_pods_total};;;; 'nodes_requested_cpu_total'=${nodes_requested_cpu_total}m;;;; 'nodes_requested_mem_total'=${nodes_requested_memory_total}Ki;;;; 'nodes_requested_pod_total'=${nodes_requested_pods_total};;;;"
+    printf "CHECK_RANCHER2 OK - All ${#node_names[*]} nodes are active|${perf_output}"
     exit ${STATE_OK}
   fi
 
@@ -672,7 +679,9 @@ else
     usage_memory=$(( 100 * $requested_memory/$capacity_memory ))
     usage_pods=$(( 100 * $requested_pods/$capacity_pods ))
 
-      # threshold checks
+  node_perf_output+="${node}_cpu=${requested_cpu};;;0;${capacity_cpu} ${node}_memory=${requested_memory}B;;;0;${capacity_memory}B ${node}_pods=${requested_pods};;;0;${capacity_pods} "
+
+  # threshold checks
   # cpu
   if [ ! -z $cpu_warn ] || [ ! -z $cpu_crit ]
   then
@@ -710,7 +719,7 @@ else
   fi
 
   # enable for debugging
-  #printf "Node: ${node} - capacity_cpu=${capacity_cpu} capacity_memory=${capacity_memory} capacity_pods=${capacity_pods} requested_cpu=${requested_cpu} requested_memory=${requested_memory} requested_pods=${requested_pods} usage_cpu=${usage_cpu=} usage_memory=${usage_memory} usage_pods=${usage_pods}\n"
+  #printf "Node: ${node} - capacity_cpu=${capacity_cpu} capacity_memory=${capacity_memory} capacity_pods=${capacity_pods} requested_cpu=${requested_cpu} requested_memory=${requested_memory} requested_pods=${requested_pods} usage_cpu=${usage_cpu} usage_memory=${usage_memory} usage_pods=${usage_pods}\n"
   let i++
   done
 
@@ -796,10 +805,10 @@ else
 
     if [[ $requested_cpu_unit == "" ]]
     then
-      requested_cpu=${requested_cpu_count}
+      requested_cpu=$(( ${requested_cpu_count} * 1000 ))
     elif [[ $requested_cpu_unit == "m" ]]
     then
-      requested_cpu=$(( ${requested_cpu_count} * 1000 ))
+      requested_cpu=${requested_cpu_count}
     fi
 
     let nodes_requested_cpu_total+=$requested_cpu
@@ -832,7 +841,7 @@ else
     let nodes_requested_pods_total+=$requested_pods
   done
 
-  perf_output="'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_capacity_cpu_total'=${nodes_capacity_cpu_total};;;; 'nodes_capacity_mem_total'=${nodes_capacity_memory_total};;;; 'nodes_capacity_pod_total'=${nodes_capacity_pods_total};;;; 'nodes_requested_cpu_total'=${nodes_requested_cpu_total};;;; 'nodes_requested_mem_total'=${nodes_requested_memory_total};;;; 'nodes_requested_pod_total'=${nodes_requested_pods_total};;;;"
+  perf_output="'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_cpu_total'=${nodes_requested_cpu_total};;;0;${nodes_capacity_cpu_total} 'nodes_memory_total'=${nodes_requested_memory_total}B;;;0B;${nodes_capacity_memory_total}B 'nodes_pods_total'=${nodes_requested_pods_total};;;0;${nodes_capacity_pods_total} ${node_perf_output}"
 
   if [[ ${#nodeerrors[*]} -gt 0 ]]
   then
