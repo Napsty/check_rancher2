@@ -86,12 +86,12 @@ Options:
 \t[ -w | --workloadname ] Workload name (for specific workload check)
 \t[ -o | --podname ] Pod name (for specific pod check, this makes only sense if you use static pods)
 \t[ -i | --ignore ] Comma-separated list of status(es) to ignore (currently only supported in node check type)
-\t[ --cpu-warn ] Exit with WARNING status if more than PERCENT of cpu capacity is used (currently only supported in node and single cluster check type)
-\t[ --cpu-crit ] Exit with CRITICAL status if more than PERCENT of cpu capacity is used (currently only supported in node and single cluster check type)
-\t[ --mem-warn ] Exit with WARNING status if more than PERCENT of mem capacity is used (currently only supported in node and single cluster check type)
-\t[ --mem-crit ] Exit with CRITICAL status if more than PERCENT of mem capacity is used (currently only supported in node and single cluster check type)
-\t[ --pods-warn ] Exit with WARNING status if more than PERCENT of pod capacity is used (currently only supported in node and single cluster check type)
-\t[ --pods-crit ] Exit with CRITICAL status if more than PERCENT of pod capacity is used (currently only supported in node and single cluster check type)
+\t[ --cpu-warn ] Exit with WARNING status if more than PERCENT of cpu capacity is used (currently only supported in cluster specific node and cluster check type)
+\t[ --cpu-crit ] Exit with CRITICAL status if more than PERCENT of cpu capacity is used (currently only supported in cluster specific node and cluster check type)
+\t[ --memory-warn ] Exit with WARNING status if more than PERCENT of mem capacity is used (currently only supported in cluster specific node and cluster check type)
+\t[ --memory-crit ] Exit with CRITICAL status if more than PERCENT of mem capacity is used (currently only supported in cluster specific node and cluster check type)
+\t[ --pods-warn ] Exit with WARNING status if more than PERCENT of pod capacity is used (currently only supported in cluster specific node and cluster check type)
+\t[ --pods-crit ] Exit with CRITICAL status if more than PERCENT of pod capacity is used (currently only supported in cluster specific node and cluster check type)
 \t[ -h  | --help ] Help. I need somebody. Help. Not just anybody. Heeeeeelp!
 
 Check Types:
@@ -301,10 +301,29 @@ else
   fi
 
   # convert capacity_cpu to be compareable with requested_cpu
-  capacity_cpu=$(( ${capacity_cpu} * 1000 ))
+  capacity_cpu_unit=( $(echo "${capacity_cpu}" | sed 's/^[0-9]*//g') )
+  capacity_cpu_count=( $(echo "${capacity_cpu}" | sed 's/[a-zA-Z]*$//g') )
+
+  if [[ $capacity_cpu_unit == "" ]]
+  then
+    capacity_cpu=$(( ${capacity_cpu_count} * 1000 ))
+  elif [[ $capacity_cpu_unit == "m" ]]
+  then
+    capacity_cpu=${capacity_cpu_count}
+  fi
 
   # remove unit from requested_cpu
-  requested_cpu=( $(echo "${requested_cpu}" | sed 's/[a-zA-Z]*$//g') )
+  requested_cpu_unit=( $(echo "${requested_cpu}" | sed 's/^[0-9]*//g') )
+  requested_cpu_count=( $(echo "${requested_cpu}" | sed 's/[a-zA-Z]*$//g') )
+
+  if [[ $requested_cpu_unit == "" ]]
+  then
+    requested_cpu=$(( ${requested_cpu_count} * 1000 ))
+  elif [[ $requested_cpu_unit == "m" ]]
+  then
+    requested_cpu=${requested_cpu_count}
+  fi
+
 
   if [[ "${clusterstate}" != "active" ]]
   then
@@ -360,7 +379,7 @@ else
     fi
   fi
 
-  perf_output="'component_errors'=${#componenterrors[*]};;;; 'cpu'=${requested_cpu};;;;${capacity_cpu} 'memory'=${requested_memory}B;;;;${capacity_memory} 'pods'=${requested_pods};;;;${capacity_pods} 'usage_cpu'=${usage_cpu};${cpu_warn};${cpu_crit};0;100 'usage_memory'=${usage_memory};${memory_warn};${memory_crit};0;100 'usage_pods'=${usage_pods};${pods_warn};${pods_crit};0;100"
+  perf_output="'component_errors'=${#componenterrors[*]};;;; 'cpu'=${requested_cpu};;;;${capacity_cpu} 'memory'=${requested_memory};;;;${capacity_memory} 'pods'=${requested_pods};;;;${capacity_pods} 'usage_cpu'=${usage_cpu};${cpu_warn};${cpu_crit};0;100 'usage_memory'=${usage_memory};${memory_warn};${memory_crit};0;100 'usage_pods'=${usage_pods};${pods_warn};${pods_crit};0;100"
 
   if [[ ${#componenterrors[*]} -gt 0 ]]
   then
@@ -612,6 +631,9 @@ else
     elif [[ $node_capacity_memory_unit == "" ]]
     then
       capacity_memory=${node_capacity_memory_count}
+    else
+      echo "UNKNOWN: unexpected memory capacity unit ($node_capacity_memory_unit)."
+      exit ${STATE_UNKNOWN}
     fi
 
     node_requested_cpu_unit=( $(echo "${node_requested_cpu[$i]}" | sed 's/^[0-9]*//g') )
@@ -637,9 +659,58 @@ else
     elif [[ $node_requested_memory_unit == "" ]]
     then
       requested_memory=${node_requested_memory_count}
+    else
+      echo "UNKNOWN: unexpected memory requested unit ($node_requested_memory_unit)."
+      exit ${STATE_UNKNOWN}
     fi
 
-    printf "Node: ${node} - capacity_cpu=${capacity_cpu} capacity_memory=${capacity_memory} capacity_pods=${node_capacity_pods[$i]} requested_cpu=${requested_cpu} requested_memory=${requested_memory} requested_pods=${node_requested_pods[$i]} \n"
+    capacity_pods=${node_capacity_pods[$i]}
+    requested_pods=${node_requested_pods[$i]}
+
+    # usage
+    usage_cpu=$(( 100 * $requested_cpu/$capacity_cpu ))
+    usage_memory=$(( 100 * $requested_memory/$capacity_memory ))
+    usage_pods=$(( 100 * $requested_pods/$capacity_pods ))
+
+      # threshold checks
+  # cpu
+  if [ ! -z $cpu_warn ] || [ ! -z $cpu_crit ]
+  then
+    if [[ "$usage_cpu" -gt "$cpu_crit" ]]
+    then
+      resourceerrors+="${node} - CPU usage ${usage_cpu} higher than crit threshold of ${cpu_crit} \n"
+    elif [[ "$usage_cpu" -gt "$cpu_warn" ]]
+    then
+      resourceerrors+="${node} - CPU usage ${usage_cpu} higher than warn threshold of ${cpu_warn} \n"
+    fi
+  fi
+
+  # memory
+  if [ ! -z $memory_warn ] || [ ! -z $memory_crit ]
+  then
+    if [[ "$usage_memory" -gt "$memory_crit" ]]
+    then
+      resourceerrors+="${node} - MEMORY usage ${usage_memory} higher than crit threshold of ${memory_crit} \n"
+    elif [[ "$usage_memory" -gt "$memory_warn" ]]
+    then
+      resourceerrors+="${node} - MEMORY usage ${usage_memory} higher than warn threshold of ${memory_warn} \n"
+    fi
+  fi
+
+  # pods
+  if [ ! -z $pods_warn ] || [ ! -z $pods_crit ]
+  then
+    if [[ "$usage_pods" -gt "$pods_crit" ]]
+    then
+      resourceerrors+="${node} - PODS Usage ${usage_pods} higher than crit threshold of ${pods_crit} \n"
+    elif [[ "$usage_pods" -gt "$pods_warn" ]]
+    then
+      resourceerrors+="${node} - PODS Usage ${usage_pods} higher than warn threshold of ${pods_warn} \n"
+    fi
+  fi
+
+  # enable for debugging
+  #printf "Node: ${node} - capacity_cpu=${capacity_cpu} capacity_memory=${capacity_memory} capacity_pods=${capacity_pods} requested_cpu=${requested_cpu} requested_memory=${requested_memory} requested_pods=${requested_pods} usage_cpu=${usage_cpu=} usage_memory=${usage_memory} usage_pods=${usage_pods}\n"
   let i++
   done
 
@@ -696,10 +767,16 @@ else
 
     if [[ $capacity_memory_unit == "Mi" ]]
     then
-      capacity_memory=$(( ${capacity_memory_count} * 1024 ))
+      capacity_memory=$(( ${capacity_memory_count} * 1024 * 1024 ))
     elif [[ $capacity_memory_unit == "Ki" ]]
     then
+      capacity_memory=$(( ${capacity_memory_count} * 1024 ))
+    elif [[ $capacity_memory_unit == "" ]]
+    then
       capacity_memory=${capacity_memory_count}
+    else
+      echo "UNKNOWN: unexpected memory capacity unit ($capacity_memory_unit)."
+      exit ${STATE_UNKNOWN}
     fi
 
     let nodes_capacity_memory_total+=$capacity_memory
@@ -719,10 +796,10 @@ else
 
     if [[ $requested_cpu_unit == "" ]]
     then
-      requested_cpu=$(( ${requested_cpu_count} * 1000 ))
+      requested_cpu=${requested_cpu_count}
     elif [[ $requested_cpu_unit == "m" ]]
     then
-      requested_cpu=${requested_cpu_count}
+      requested_cpu=$(( ${requested_cpu_count} * 1000 ))
     fi
 
     let nodes_requested_cpu_total+=$requested_cpu
@@ -735,10 +812,16 @@ else
 
     if [[ $requested_memory_unit == "Mi" ]]
     then
-      requested_memory=$(( ${requested_memory_count} * 1024 ))
+      requested_memory=$(( ${requested_memory_count} * 1024 * 1024))
     elif [[ $requested_memory_unit == "Ki" ]]
     then
+      requested_memory=$(( ${requested_memory_count} * 1024))
+    elif [[ $requested_memory_unit == "" ]]
+    then
       requested_memory=${requested_memory_count}
+    else
+      echo "UNKNOWN: unexpected memory requested unit ($requested_memory_unit)."
+      exit ${STATE_UNKNOWN}
     fi
 
     let nodes_requested_memory_total+=$requested_memory
@@ -749,25 +832,26 @@ else
     let nodes_requested_pods_total+=$requested_pods
   done
 
+  perf_output="'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_capacity_cpu_total'=${nodes_capacity_cpu_total};;;; 'nodes_capacity_mem_total'=${nodes_capacity_memory_total};;;; 'nodes_capacity_pod_total'=${nodes_capacity_pods_total};;;; 'nodes_requested_cpu_total'=${nodes_requested_cpu_total};;;; 'nodes_requested_mem_total'=${nodes_requested_memory_total};;;; 'nodes_requested_pod_total'=${nodes_requested_pods_total};;;;"
 
-  if [[ ${#nodeerrors[*]} -gt 0 ]]; then
-    echo "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_capacity_cpu_total'=${nodes_capacity_cpu_total}m;;;; 'nodes_capacity_mem_total'=${nodes_capacity_memory_total}Ki;;;; 'nodes_capacity_pod_total'=${nodes_capacity_pods_total};;;; 'nodes_requested_cpu_total'=${nodes_requested_cpu_total}m;;;; 'nodes_requested_mem_total'=${nodes_requested_memory_total}Ki;;;; 'nodes_requested_pod_total'=${nodes_requested_pods_total};;;;"
+  if [[ ${#nodeerrors[*]} -gt 0 ]]
+  then
+    printf "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|${perf_output}\n${nodeerrors}"
     exit ${STATE_CRITICAL}
-  elif [[ ${#nodeignored[*]} -gt 0 ]]; then
-    echo "CHECK_RANCHER2 OK - All nodes OK - Info: ${nodeignored[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_capacity_cpu_total'=${nodes_capacity_cpu_total}m;;;; 'nodes_capacity_mem_total'=${nodes_capacity_memory_total}Ki;;;; 'nodes_capacity_pod_total'=${nodes_capacity_pods_total};;;; 'nodes_requested_cpu_total'=${nodes_requested_cpu_total}m;;;; 'nodes_requested_mem_total'=${nodes_requested_memory_total}Ki;;;; 'nodes_requested_pod_total'=${nodes_requested_pods_total};;;;"
+  elif [[ ! -z ${resourceerrors} ]]
+  then
+    printf "CHECK_RANCHER2 CRITICAL - Nodes with resource problems|${perf_output}\n${resourceerrors}"
+    exit ${STATE_CRITICAL}
+  elif [[ ${#nodeerrors[*]} -gt 0 ]] && [[ ! -z ${resourceerrors} ]]
+  then
+    printf "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]} and resource problems|${perf_output}\n${resourceerrors} ${nodeerrors}"
+    exit ${STATE_CRITICAL}
+  elif [[ ${#nodeignored[*]} -gt 0 ]]
+  then
+    printf "CHECK_RANCHER2 OK - All nodes OK - Info: ${nodeignored[*]}|${perf_output}"
     exit ${STATE_OK}
   else
-    echo "CHECK_RANCHER2 OK - All ${#node_names[*]} nodes are active|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_capacity_cpu_total'=${nodes_capacity_cpu_total}m;;;; 'nodes_capacity_mem_total'=${nodes_capacity_memory_total}Ki;;;; 'nodes_capacity_pod_total'=${nodes_capacity_pods_total};;;; 'nodes_requested_cpu_total'=${nodes_requested_cpu_total}m;;;; 'nodes_requested_mem_total'=${nodes_requested_memory_total}Ki;;;; 'nodes_requested_pod_total'=${nodes_requested_pods_total};;;;"
-    exit ${STATE_OK}
-  fi
-  if [[ ${#nodeerrors[*]} -gt 0 ]]; then
-    echo "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_capacity_cpu_total'=${nodes_capacity_cpu_total}m;;;; 'nodes_capacity_mem_total'=${nodes_capacity_memory_total}Ki;;;; 'nodes_capacity_pod_total'=${nodes_capacity_pods_total};;;; 'nodes_requested_cpu_total'=${nodes_requested_cpu_total}m;;;; 'nodes_requested_mem_total'=${nodes_requested_memory_total}Ki;;;; 'nodes_requested_pod_total'=${nodes_requested_pods_total};;;;"
-    exit ${STATE_CRITICAL}
-  elif [[ ${#nodeignored[*]} -gt 0 ]]; then
-    echo "CHECK_RANCHER2 OK - All nodes OK - Info: ${nodeignored[*]}|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_capacity_cpu_total'=${nodes_capacity_cpu_total}m;;;; 'nodes_capacity_mem_total'=${nodes_capacity_memory_total}Ki;;;; 'nodes_capacity_pod_total'=${nodes_capacity_pods_total};;;; 'nodes_requested_cpu_total'=${nodes_requested_cpu_total}m;;;; 'nodes_requested_mem_total'=${nodes_requested_memory_total}Ki;;;; 'nodes_requested_pod_total'=${nodes_requested_pods_total};;;;"
-    exit ${STATE_OK}
-  else
-    echo "CHECK_RANCHER2 OK - All ${#node_names[*]} nodes are active|'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_capacity_cpu_total'=${nodes_capacity_cpu_total}m;;;; 'nodes_capacity_mem_total'=${nodes_capacity_memory_total}Ki;;;; 'nodes_capacity_pod_total'=${nodes_capacity_pods_total};;;; 'nodes_requested_cpu_total'=${nodes_requested_cpu_total}m;;;; 'nodes_requested_mem_total'=${nodes_requested_memory_total}Ki;;;; 'nodes_requested_pod_total'=${nodes_requested_pods_total};;;;"
+    printf "CHECK_RANCHER2 OK - All ${#node_names[*]} nodes are active|${perf_output}"
     exit ${STATE_OK}
   fi
 
