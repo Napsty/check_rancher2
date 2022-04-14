@@ -379,7 +379,7 @@ else
     fi
   fi
 
-  perf_output="'component_errors'=${#componenterrors[*]};;;; 'cpu'=${requested_cpu};;;;${capacity_cpu} 'memory'=${requested_memory}B;;;0B;${capacity_memory}B 'pods'=${requested_pods};;;;${capacity_pods} 'usage_cpu'=${usage_cpu}%;${cpu_warn}%;${cpu_crit}%;0%;100% 'usage_memory'=${usage_memory}%;${memory_warn}%;${memory_crit}%;0%;100% 'usage_pods'=${usage_pods}%;${pods_warn}%;${pods_crit}%;0%;100%"
+  perf_output="'component_errors'=${#componenterrors[*]};;;; 'cpu'=${requested_cpu};;;;${capacity_cpu} 'memory'=${requested_memory}B;;;0;${capacity_memory} 'pods'=${requested_pods};;;;${capacity_pods} 'usage_cpu'=${usage_cpu}%%;${cpu_warn};${cpu_crit};0;100 'usage_memory'=${usage_memory}%%;${memory_warn};${memory_crit};0;100 'usage_pods'=${usage_pods}%%;${pods_warn};${pods_crit};0;100"
 
   if [[ ${#componenterrors[*]} -gt 0 ]]
   then
@@ -554,7 +554,7 @@ if [[ -z $clustername ]]; then
     let nodes_requested_pods_total+=$requested_pods
   done
 
-  perf_output="'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_cpu_total'=${nodes_requested_cpu_total};;;0;${nodes_capacity_cpu_total} 'nodes_memory_total'=${nodes_requested_memory_total}B;;;0B;${nodes_capacity_memory_total}B 'nodes_pods_total'=${nodes_requested_pods_total};;;0;${nodes_capacity_pods_total}"
+  perf_output="'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_cpu_total'=${nodes_requested_cpu_total};;;0;${nodes_capacity_cpu_total} 'nodes_memory_total'=${nodes_requested_memory_total}B;;;0;${nodes_capacity_memory_total} 'nodes_pods_total'=${nodes_requested_pods_total};;;0;${nodes_capacity_pods_total}"
   
   if [[ ${#nodeerrors[*]} -gt 0 ]]; then
     printf "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|${perf_output}"
@@ -679,7 +679,7 @@ else
     usage_memory=$(( 100 * $requested_memory/$capacity_memory ))
     usage_pods=$(( 100 * $requested_pods/$capacity_pods ))
 
-  node_perf_output+="${node}_cpu=${requested_cpu};;;0;${capacity_cpu} ${node}_memory=${requested_memory}B;;;0;${capacity_memory}B ${node}_pods=${requested_pods};;;0;${capacity_pods} "
+  node_perf_output+="${node}_cpu=${requested_cpu};;;0;${capacity_cpu} ${node}_memory=${requested_memory}B;;;0;${capacity_memory} ${node}_pods=${requested_pods};;;0;${capacity_pods} "
 
   # threshold checks
   # cpu
@@ -841,7 +841,7 @@ else
     let nodes_requested_pods_total+=$requested_pods
   done
 
-  perf_output="'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_cpu_total'=${nodes_requested_cpu_total};;;0;${nodes_capacity_cpu_total} 'nodes_memory_total'=${nodes_requested_memory_total}B;;;0B;${nodes_capacity_memory_total}B 'nodes_pods_total'=${nodes_requested_pods_total};;;0;${nodes_capacity_pods_total} ${node_perf_output}"
+  perf_output="'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_cpu_total'=${nodes_requested_cpu_total};;;0;${nodes_capacity_cpu_total} 'nodes_memory_total'=${nodes_requested_memory_total}B;;;0;${nodes_capacity_memory_total} 'nodes_pods_total'=${nodes_requested_pods_total};;;0;${nodes_capacity_pods_total} ${node_perf_output}"
 
   if [[ ${#nodeerrors[*]} -gt 0 ]]
   then
