@@ -282,12 +282,22 @@ else
   # get unit
   declare -a requested_memory_unit=( $(echo "${requested_memory}" | sed 's/^[0-9]*//g') )
   declare -a requested_memory_count=( $(echo "${requested_memory}" | sed 's/[a-zA-Z]*$//g') )
-  if [[ $requested_memory_unit == "Mi" ]]
+
+  if [[ ${requested_memory_unit} == "Gi" ]]
+  then
+    requested_memory=$(( ${requested_memory_count} * 1024 * 1024 * 1024 ))
+  elif [[ ${requested_memory_unit} == "Mi" ]]
   then
     requested_memory=$(( ${requested_memory_count} * 1024 * 1024 ))
-  elif [[ $requested_memory_unit == "Ki" ]]
+  elif [[ ${requested_memory_unit} == "Ki" ]]
   then
     requested_memory=$(( ${requested_memory_count} * 1024 ))
+  elif [[ ${requested_memory_unit} == "" ]]
+  then
+    requested_memory=$(( ${requested_memory_count} ))
+  else
+    echo "UNKNOWN: unexpected memory unit (${requested_memory_unit})."
+    exit ${STATE_UNKNOWN}
   fi
 
   # convert capacity_memory dependened by unit
@@ -295,9 +305,21 @@ else
   declare -a capacity_memory_unit=( $(echo "${capacity_memory}" | sed 's/^[0-9]*//g') )
   declare -a capacity_memory_count=( $(echo "${capacity_memory}" | sed 's/[a-zA-Z]*$//g') )
 
-  if [[ $capacity_memory_unit == "Ki" ]]
+  if [[ ${capacity_memory_unit} == "Gi" ]]
+  then
+    capacity_memory=$(( ${capacity_memory_count} * 1024 * 1024 * 1024 ))
+  elif [[ ${capacity_memory_unit} == "Mi" ]]
+  then
+    capacity_memory=$(( ${capacity_memory_count} * 1024 * 1024 ))
+  elif [[ ${capacity_memory_unit} == "Ki" ]]
   then
     capacity_memory=$(( ${capacity_memory_count} * 1024 ))
+  elif [[ ${capacity_memory_unit} == "" ]]
+  then
+    capacity_memory=$(( ${capacity_memory_count} ))
+  else
+    echo "UNKNOWN: unexpected memory unit (${capacity_memory_unit})."
+    exit ${STATE_UNKNOWN}
   fi
 
   # convert capacity_cpu to be compareable with requested_cpu
@@ -494,15 +516,21 @@ if [[ -z $clustername ]]; then
     capacity_memory_unit=( $(echo "${capacity_memory}" | sed 's/^[0-9]*//g') )
     capacity_memory_count=( $(echo "${capacity_memory}" | sed 's/[a-zA-Z]*$//g') )
 
-    if [[ $capacity_memory_unit == "Mi" ]]
+    if [[ ${capacity_memory_unit} == "Gi" ]]
+    then
+      capacity_memory=$(( ${capacity_memory_count} * 1024 * 1024 * 1024 ))
+    elif [[ ${capacity_memory_unit} == "Mi" ]]
     then
       capacity_memory=$(( ${capacity_memory_count} * 1024 * 1024 ))
-    elif [[ $capacity_memory_unit == "Ki" ]]
+    elif [[ ${capacity_memory_unit} == "Ki" ]]
     then
       capacity_memory=$(( ${capacity_memory_count} * 1024 ))
-    elif [[ $capacity_memory_unit == "" ]]
+    elif [[ ${capacity_memory_unit} == "" ]]
     then
       capacity_memory=${capacity_memory_count}
+    else
+      echo "UNKNOWN: unexpected memory unit (${capacity_memory_unit})."
+      exit ${STATE_UNKNOWN}
     fi
 
     let nodes_capacity_memory_total+=$capacity_memory
@@ -535,15 +563,21 @@ if [[ -z $clustername ]]; then
     requested_memory_unit=( $(echo "${requested_memory}" | sed 's/^[0-9]*//g') )
     requested_memory_count=( $(echo "${requested_memory}" | sed 's/[a-zA-Z]*$//g') )
 
-    if [[ $requested_memory_unit == "Mi" ]]
+    if [[ ${requested_memory_unit} == "Gi" ]]
+    then
+      requested_memory=$(( ${requested_memory_count} * 1024 * 1024 * 1024 ))
+    elif [[ ${requested_memory_unit} == "Mi" ]]
     then
       requested_memory=$(( ${requested_memory_count} * 1024 * 1024 ))
-    elif [[ $requested_memory_unit == "Ki" ]]
+    elif [[ ${requested_memory_unit} == "Ki" ]]
     then
       requested_memory=$(( ${requested_memory_count} * 1024 ))
-    elif [[ $requested_memory_unit == "" ]]
+    elif [[ ${requested_memory_unit} == "" ]]
     then
       requested_memory=${requested_memory_count}
+    else
+      echo "UNKNOWN: unexpected memory unit (${requested_memory_unit})."
+      exit ${STATE_UNKNOWN}
     fi
 
     let nodes_requested_memory_total+=$requested_memory
@@ -629,17 +663,20 @@ else
     node_capacity_memory_unit=( $(echo "${node_capacity_memory[$i]}" | sed 's/^[0-9]*//g') )
     node_capacity_memory_count=( $(echo "${node_capacity_memory[$i]}" | sed 's/[a-zA-Z]*$//g') )
 
-    if [[ $node_capacity_memory_unit == "Mi" ]]
+    if [[ ${node_capacity_memory_unit} == "Gi" ]]
+    then
+      capacity_memory=$(( ${node_capacity_memory_count} * 1024 * 1024 * 1024 ))
+    elif [[ ${node_capacity_memory_unit} == "Mi" ]]
     then
       capacity_memory=$(( ${node_capacity_memory_count} * 1024 * 1024 ))
-    elif [[ $node_capacity_memory_unit == "Ki" ]]
+    elif [[ ${node_capacity_memory_unit} == "Ki" ]]
     then
       capacity_memory=$(( ${node_capacity_memory_count} * 1024 ))
-    elif [[ $node_capacity_memory_unit == "" ]]
+    elif [[ ${node_capacity_memory_unit} == "" ]]
     then
       capacity_memory=${node_capacity_memory_count}
     else
-      echo "UNKNOWN: unexpected memory capacity unit ($node_capacity_memory_unit)."
+      echo "UNKNOWN: unexpected memory unit (${node_capacity_memory_unit})."
       exit ${STATE_UNKNOWN}
     fi
 
@@ -657,17 +694,20 @@ else
     node_requested_memory_unit=( $(echo "${node_requested_memory[$i]}" | sed 's/^[0-9]*//g') )
     node_requested_memory_count=( $(echo "${node_requested_memory[$i]}" | sed 's/[a-zA-Z]*$//g') )
 
-    if [[ $node_requested_memory_unit == "Mi" ]]
+    if [[ ${node_requested_memory_unit} == "Gi" ]]
+    then
+      requested_memory=$(( ${node_requested_memory_count} * 1024 * 1024 * 1024 ))
+    elif [[ ${node_requested_memory_unit} == "Mi" ]]
     then
       requested_memory=$(( ${node_requested_memory_count} * 1024 * 1024 ))
-    elif [[ $node_requested_memory_unit == "Ki" ]]
+    elif [[ ${node_requested_memory_unit} == "Ki" ]]
     then
       requested_memory=$(( ${node_requested_memory_count} * 1024 ))
-    elif [[ $node_requested_memory_unit == "" ]]
+    elif [[ ${node_requested_memory_unit} == "" ]]
     then
       requested_memory=${node_requested_memory_count}
     else
-      echo "UNKNOWN: unexpected memory requested unit ($node_requested_memory_unit)."
+      echo "UNKNOWN: unexpected memory (${node_requested_memory_unit})."
       exit ${STATE_UNKNOWN}
     fi
 
@@ -772,17 +812,20 @@ else
     capacity_memory_unit=( $(echo "${capacity_memory}" | sed 's/^[0-9]*//g') )
     capacity_memory_count=( $(echo "${capacity_memory}" | sed 's/[a-zA-Z]*$//g') )
 
-    if [[ $capacity_memory_unit == "Mi" ]]
+    if [[ ${capacity_memory_unit} == "Gi" ]]
+    then
+      capacity_memory=$(( ${capacity_memory_count} * 1024 * 1024 * 1024 ))
+    elif [[ ${capacity_memory_unit} == "Mi" ]]
     then
       capacity_memory=$(( ${capacity_memory_count} * 1024 * 1024 ))
-    elif [[ $capacity_memory_unit == "Ki" ]]
+    elif [[ ${capacity_memory_unit} == "Ki" ]]
     then
       capacity_memory=$(( ${capacity_memory_count} * 1024 ))
-    elif [[ $capacity_memory_unit == "" ]]
+    elif [[ ${capacity_memory_unit} == "" ]]
     then
       capacity_memory=${capacity_memory_count}
     else
-      echo "UNKNOWN: unexpected memory capacity unit ($capacity_memory_unit)."
+      echo "UNKNOWN: unexpected memory unit (${capacity_memory_unit})."
       exit ${STATE_UNKNOWN}
     fi
 
@@ -817,17 +860,20 @@ else
     requested_memory_unit=( $(echo "${requested_memory}" | sed 's/^[0-9]*//g') )
     requested_memory_count=( $(echo "${requested_memory}" | sed 's/[a-zA-Z]*$//g') )
 
-    if [[ $requested_memory_unit == "Mi" ]]
+    if [[ ${requested_memory_unit} == "Gi" ]]
     then
-      requested_memory=$(( ${requested_memory_count} * 1024 * 1024))
-    elif [[ $requested_memory_unit == "Ki" ]]
+      requested_memory=$(( ${requested_memory_count} * 1024 * 1024 * 1024 ))
+    elif [[ ${requested_memory_unit} == "Mi" ]]
     then
-      requested_memory=$(( ${requested_memory_count} * 1024))
-    elif [[ $requested_memory_unit == "" ]]
+      requested_memory=$(( ${requested_memory_count} * 1024 * 1024 ))
+    elif [[ ${requested_memory_unit} == "Ki" ]]
+    then
+      requested_memory=$(( ${requested_memory_count} * 1024 ))
+    elif [[ ${requested_memory_unit} == "" ]]
     then
       requested_memory=${requested_memory_count}
     else
-      echo "UNKNOWN: unexpected memory requested unit ($requested_memory_unit)."
+      echo "UNKNOWN: unexpected memory unit (${requested_memory_unit})."
       exit ${STATE_UNKNOWN}
     fi
 
