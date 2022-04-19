@@ -57,17 +57,84 @@ export PATH=/usr/local/bin:/usr/bin:/bin:$PATH # Set path
 proto=http		# Protocol to use, default is http, can be overwritten with -S parameter
 version=1.7.1
 
-# Check for necessary commands
-for cmd in jq curl [
-do
- if ! `which ${cmd} 1>/dev/null`
- then
- echo "UNKNOWN: ${cmd} does not exist, please check if command exists and PATH is correct"
- exit ${STATE_UNKNOWN}
- fi
-done
+# functions
 
-#########################################################################
+# https://kubernetes.io/docs/reference/kubernetes-api/common-definitions/quantity/
+# convert memory to smallest possible value byte dependened by unit
+function convertMemory()
+{
+  local memory_count=$1
+  local memory_unit=$2
+  
+  if [[ ${memory_unit} == "Ei" ]]
+  then
+    memory=$(( ${memory_count} * 1024 * 1024 * 1024 * 1024 * 1024 * 1024 ))
+  elif [[ ${memory_unit} == "E" ]]
+  then
+    memory=$(( ${memory_count} * 1000 * 1000 * 1000 * 1000 * 1000 * 1000 ))
+  elif [[ ${memory_unit} == "Pi" ]]
+  then
+    memory=$(( ${memory_count} * 1024 * 1024 * 1024 * 1024 * 1024 ))
+  elif [[ ${memory_unit} == "P" ]]
+  then
+    memory=$(( ${memory_count} * 1000 * 1000 * 1000 * 1000 * 1000 ))
+  elif [[ ${memory_unit} == "Ti" ]]
+  then
+    memory=$(( ${memory_count} * 1024 * 1024 * 1024 * 1024 ))
+  elif [[ ${memory_unit} == "T" ]]
+  then
+    memory=$(( ${memory_count} * 1000 * 1000 * 1000 * 1000 ))
+  elif [[ ${memory_unit} == "Gi" ]]
+  then
+    memory=$(( ${memory_count} * 1024 * 1024 * 1024 ))
+  elif [[ ${memory_unit} == "G" ]]
+  then
+    memory=$(( ${memory_count} * 1000 * 1000 * 1000 ))
+  elif [[ ${memory_unit} == "Mi" ]]
+  then
+    memory=$(( ${memory_count} * 1024 * 1024 ))
+  elif [[ ${memory_unit} == "M" ]]
+  then
+    memory=$(( ${memory_count} * 1000 * 1000 ))
+  elif [[ ${memory_unit} == "Ki" ]]
+  then
+    memory=$(( ${memory_count} * 1024 ))
+  elif [[ ${memory_unit} == "k" ]]
+  then
+    memory=$(( ${memory_count} * 1000 ))
+  elif [[ ${memory_unit} == "" ]]
+  then
+    memory=$(( ${memory_count} ))
+  else
+    echo "UNKNOWN: unexpected memory unit (${memory_unit})."
+    exit ${STATE_UNKNOWN}
+  fi
+
+  printf $memory
+}
+
+# convert cpu to smallest possible value (m = milli CPU) dependened by unit
+function convertCpu()
+{
+  local cpu_count=$1
+  local cpu_unit=$2
+  
+  # m = milli CPU
+  if [[ ${cpu_unit} == "m" ]]
+  then
+    cpu=${cpu_count}
+  # no unit means full cpu
+  elif [[ ${cpu_unit} == "" ]]
+  then
+    cpu=$(( ${cpu_count} * 1000 ))
+  else
+    echo "UNKNOWN: unexpected cpu unit (${cpu_unit})."
+    exit ${STATE_UNKNOWN}
+  fi
+
+  printf $cpu
+}
+
 # We all need help from time to time
 usage () {
 printf "check_rancher2 v ${version} (c) 2018-2021 Claudio Kuenzler and contributers (published under GPLv2)
@@ -104,6 +171,18 @@ Check Types:
 "
 exit ${STATE_UNKNOWN}
 }
+
+# Check for necessary commands
+for cmd in jq curl [
+do
+ if ! `which ${cmd} 1>/dev/null`
+ then
+ echo "UNKNOWN: ${cmd} does not exist, please check if command exists and PATH is correct"
+ exit ${STATE_UNKNOWN}
+ fi
+done
+
+#########################################################################
 
 PARSED_ARGUMENTS=$(getopt -a -n check_rancher2 -o H:U:P:t:c:p:n:w:o:Ssi:h --long apihost:,apiuser:,apipass:,type:,clustername:,projectname:,namespacename:,workloadname:,podname:,secure,selfsigned,ignore:,cpu-warn:,cpu-crit:,memory-warn:,memory-crit:,pods-warn:,pods-crit: -- "$@")
 VALID_ARGUMENTS=$?
@@ -283,69 +362,26 @@ else
   declare -a requested_memory_unit=( $(echo "${requested_memory}" | sed 's/^[0-9]*//g') )
   declare -a requested_memory_count=( $(echo "${requested_memory}" | sed 's/[a-zA-Z]*$//g') )
 
-  if [[ ${requested_memory_unit} == "Gi" ]]
-  then
-    requested_memory=$(( ${requested_memory_count} * 1024 * 1024 * 1024 ))
-  elif [[ ${requested_memory_unit} == "Mi" ]]
-  then
-    requested_memory=$(( ${requested_memory_count} * 1024 * 1024 ))
-  elif [[ ${requested_memory_unit} == "Ki" ]]
-  then
-    requested_memory=$(( ${requested_memory_count} * 1024 ))
-  elif [[ ${requested_memory_unit} == "" ]]
-  then
-    requested_memory=$(( ${requested_memory_count} ))
-  else
-    echo "UNKNOWN: unexpected memory unit (${requested_memory_unit})."
-    exit ${STATE_UNKNOWN}
-  fi
+  requested_memory=$(convertMemory ${requested_memory_count} ${requested_memory_unit})
 
   # convert capacity_memory dependened by unit
   # get unit
   declare -a capacity_memory_unit=( $(echo "${capacity_memory}" | sed 's/^[0-9]*//g') )
   declare -a capacity_memory_count=( $(echo "${capacity_memory}" | sed 's/[a-zA-Z]*$//g') )
 
-  if [[ ${capacity_memory_unit} == "Gi" ]]
-  then
-    capacity_memory=$(( ${capacity_memory_count} * 1024 * 1024 * 1024 ))
-  elif [[ ${capacity_memory_unit} == "Mi" ]]
-  then
-    capacity_memory=$(( ${capacity_memory_count} * 1024 * 1024 ))
-  elif [[ ${capacity_memory_unit} == "Ki" ]]
-  then
-    capacity_memory=$(( ${capacity_memory_count} * 1024 ))
-  elif [[ ${capacity_memory_unit} == "" ]]
-  then
-    capacity_memory=$(( ${capacity_memory_count} ))
-  else
-    echo "UNKNOWN: unexpected memory unit (${capacity_memory_unit})."
-    exit ${STATE_UNKNOWN}
-  fi
+  capacity_memory=$(convertMemory ${capacity_memory_count} ${capacity_memory_unit})
 
   # convert capacity_cpu to be compareable with requested_cpu
   capacity_cpu_unit=( $(echo "${capacity_cpu}" | sed 's/^[0-9]*//g') )
   capacity_cpu_count=( $(echo "${capacity_cpu}" | sed 's/[a-zA-Z]*$//g') )
 
-  if [[ $capacity_cpu_unit == "" ]]
-  then
-    capacity_cpu=$(( ${capacity_cpu_count} * 1000 ))
-  elif [[ $capacity_cpu_unit == "m" ]]
-  then
-    capacity_cpu=${capacity_cpu_count}
-  fi
+  capacity_cpu=$(convertCpu ${capacity_cpu_count} ${capacity_cpu_unit})
 
   # remove unit from requested_cpu
   requested_cpu_unit=( $(echo "${requested_cpu}" | sed 's/^[0-9]*//g') )
   requested_cpu_count=( $(echo "${requested_cpu}" | sed 's/[a-zA-Z]*$//g') )
 
-  if [[ $requested_cpu_unit == "" ]]
-  then
-    requested_cpu=$(( ${requested_cpu_count} * 1000 ))
-  elif [[ $requested_cpu_unit == "m" ]]
-  then
-    requested_cpu=${requested_cpu_count}
-  fi
-
+  requested_cpu=$(convertCpu ${requested_cpu_count} ${requested_cpu_unit})
 
   if [[ "${clusterstate}" != "active" ]]
   then
@@ -500,13 +536,7 @@ if [[ -z $clustername ]]; then
     capacity_cpu_unit=( $(echo "${capacity_cpu}" | sed 's/^[0-9]*//g') )
     capacity_cpu_count=( $(echo "${capacity_cpu}" | sed 's/[a-zA-Z]*$//g') )
 
-    if [[ $capacity_cpu_unit == "" ]]
-    then
-      capacity_cpu=$(( ${capacity_cpu_count} * 1000 ))
-    elif [[ $capacity_cpu_unit == "m" ]]
-    then
-      capacity_cpu=${capacity_cpu_count}
-    fi
+    capacity_cpu=$(convertCpu ${capacity_cpu_count} ${capacity_cpu_unit})
 
     let nodes_capacity_cpu_total+=$capacity_cpu
   done
@@ -516,22 +546,7 @@ if [[ -z $clustername ]]; then
     capacity_memory_unit=( $(echo "${capacity_memory}" | sed 's/^[0-9]*//g') )
     capacity_memory_count=( $(echo "${capacity_memory}" | sed 's/[a-zA-Z]*$//g') )
 
-    if [[ ${capacity_memory_unit} == "Gi" ]]
-    then
-      capacity_memory=$(( ${capacity_memory_count} * 1024 * 1024 * 1024 ))
-    elif [[ ${capacity_memory_unit} == "Mi" ]]
-    then
-      capacity_memory=$(( ${capacity_memory_count} * 1024 * 1024 ))
-    elif [[ ${capacity_memory_unit} == "Ki" ]]
-    then
-      capacity_memory=$(( ${capacity_memory_count} * 1024 ))
-    elif [[ ${capacity_memory_unit} == "" ]]
-    then
-      capacity_memory=${capacity_memory_count}
-    else
-      echo "UNKNOWN: unexpected memory unit (${capacity_memory_unit})."
-      exit ${STATE_UNKNOWN}
-    fi
+    capacity_memory=$(convertMemory ${capacity_memory_count} ${capacity_memory_unit})
 
     let nodes_capacity_memory_total+=$capacity_memory
   done
@@ -547,13 +562,7 @@ if [[ -z $clustername ]]; then
     requested_cpu_unit=( $(echo "${requested_cpu}" | sed 's/^[0-9]*//g') )
     requested_cpu_count=( $(echo "${requested_cpu}" | sed 's/[a-zA-Z]*$//g') )
 
-    if [[ $requested_cpu_unit == "" ]]
-    then
-      requested_cpu=$(( ${requested_cpu_count} * 1000 ))
-    elif [[ $requested_cpu_unit == "m" ]]
-    then
-      requested_cpu=${requested_cpu_count}
-    fi
+    requested_cpu=$(convertCpu ${requested_cpu_count} ${requested_cpu_unit})
 
     let nodes_requested_cpu_total+=$requested_cpu
   done
@@ -563,22 +572,7 @@ if [[ -z $clustername ]]; then
     requested_memory_unit=( $(echo "${requested_memory}" | sed 's/^[0-9]*//g') )
     requested_memory_count=( $(echo "${requested_memory}" | sed 's/[a-zA-Z]*$//g') )
 
-    if [[ ${requested_memory_unit} == "Gi" ]]
-    then
-      requested_memory=$(( ${requested_memory_count} * 1024 * 1024 * 1024 ))
-    elif [[ ${requested_memory_unit} == "Mi" ]]
-    then
-      requested_memory=$(( ${requested_memory_count} * 1024 * 1024 ))
-    elif [[ ${requested_memory_unit} == "Ki" ]]
-    then
-      requested_memory=$(( ${requested_memory_count} * 1024 ))
-    elif [[ ${requested_memory_unit} == "" ]]
-    then
-      requested_memory=${requested_memory_count}
-    else
-      echo "UNKNOWN: unexpected memory unit (${requested_memory_unit})."
-      exit ${STATE_UNKNOWN}
-    fi
+    requested_memory=$(convertMemory ${requested_memory_count} ${requested_memory_unit})
 
     let nodes_requested_memory_total+=$requested_memory
   done
@@ -652,64 +646,22 @@ else
     node_capacity_cpu_unit=( $(echo "${node_capacity_cpu[$i]}" | sed 's/^[0-9]*//g') )
     node_capacity_cpu_count=( $(echo "${node_capacity_cpu[$i]}" | sed 's/[a-zA-Z]*$//g') )
 
-    if [[ $node_capacity_cpu_unit == "" ]]
-    then
-      capacity_cpu=$(( ${node_capacity_cpu_count} * 1000 ))
-    elif [[ $node_capacity_cpu_unit == "m" ]]
-    then
-      capacity_cpu=${node_capacity_cpu_count}
-    fi
+    capacity_cpu=$(convertCpu ${node_capacity_cpu_count} ${node_capacity_cpu_unit})
 
     node_capacity_memory_unit=( $(echo "${node_capacity_memory[$i]}" | sed 's/^[0-9]*//g') )
     node_capacity_memory_count=( $(echo "${node_capacity_memory[$i]}" | sed 's/[a-zA-Z]*$//g') )
 
-    if [[ ${node_capacity_memory_unit} == "Gi" ]]
-    then
-      capacity_memory=$(( ${node_capacity_memory_count} * 1024 * 1024 * 1024 ))
-    elif [[ ${node_capacity_memory_unit} == "Mi" ]]
-    then
-      capacity_memory=$(( ${node_capacity_memory_count} * 1024 * 1024 ))
-    elif [[ ${node_capacity_memory_unit} == "Ki" ]]
-    then
-      capacity_memory=$(( ${node_capacity_memory_count} * 1024 ))
-    elif [[ ${node_capacity_memory_unit} == "" ]]
-    then
-      capacity_memory=${node_capacity_memory_count}
-    else
-      echo "UNKNOWN: unexpected memory unit (${node_capacity_memory_unit})."
-      exit ${STATE_UNKNOWN}
-    fi
+    capacity_memory=$(convertMemory ${node_capacity_memory_count} ${node_capacity_memory_unit})
 
     node_requested_cpu_unit=( $(echo "${node_requested_cpu[$i]}" | sed 's/^[0-9]*//g') )
     node_requested_cpu_count=( $(echo "${node_requested_cpu[$i]}" | sed 's/[a-zA-Z]*$//g') )
 
-    if [[ $node_requested_cpu_unit == "" ]]
-    then
-      requested_cpu=$(( ${node_requested_cpu_count} * 1000 ))
-    elif [[ $node_requested_cpu_unit == "m" ]]
-    then
-      requested_cpu=${node_requested_cpu_count}
-    fi
+    requested_cpu=$(convertCpu ${node_requested_cpu_count} ${node_requested_cpu_unit})
 
     node_requested_memory_unit=( $(echo "${node_requested_memory[$i]}" | sed 's/^[0-9]*//g') )
     node_requested_memory_count=( $(echo "${node_requested_memory[$i]}" | sed 's/[a-zA-Z]*$//g') )
 
-    if [[ ${node_requested_memory_unit} == "Gi" ]]
-    then
-      requested_memory=$(( ${node_requested_memory_count} * 1024 * 1024 * 1024 ))
-    elif [[ ${node_requested_memory_unit} == "Mi" ]]
-    then
-      requested_memory=$(( ${node_requested_memory_count} * 1024 * 1024 ))
-    elif [[ ${node_requested_memory_unit} == "Ki" ]]
-    then
-      requested_memory=$(( ${node_requested_memory_count} * 1024 ))
-    elif [[ ${node_requested_memory_unit} == "" ]]
-    then
-      requested_memory=${node_requested_memory_count}
-    else
-      echo "UNKNOWN: unexpected memory (${node_requested_memory_unit})."
-      exit ${STATE_UNKNOWN}
-    fi
+    requested_memory=$(convertMemory ${node_requested_memory_count} ${node_requested_memory_unit})
 
     capacity_pods=${node_capacity_pods[$i]}
     requested_pods=${node_requested_pods[$i]}
@@ -796,13 +748,7 @@ else
     capacity_cpu_unit=( $(echo "${capacity_cpu}" | sed 's/^[0-9]*//g') )
     capacity_cpu_count=( $(echo "${capacity_cpu}" | sed 's/[a-zA-Z]*$//g') )
 
-    if [[ $capacity_cpu_unit == "" ]]
-    then
-      capacity_cpu=$(( ${capacity_cpu_count} * 1000 ))
-    elif [[ $capacity_cpu_unit == "m" ]]
-    then
-      capacity_cpu=${capacity_cpu_count}
-    fi
+    capacity_cpu=$(convertCpu ${capacity_cpu_count} ${capacity_cpu_unit})
 
     let nodes_capacity_cpu_total+=$capacity_cpu
   done
@@ -812,22 +758,7 @@ else
     capacity_memory_unit=( $(echo "${capacity_memory}" | sed 's/^[0-9]*//g') )
     capacity_memory_count=( $(echo "${capacity_memory}" | sed 's/[a-zA-Z]*$//g') )
 
-    if [[ ${capacity_memory_unit} == "Gi" ]]
-    then
-      capacity_memory=$(( ${capacity_memory_count} * 1024 * 1024 * 1024 ))
-    elif [[ ${capacity_memory_unit} == "Mi" ]]
-    then
-      capacity_memory=$(( ${capacity_memory_count} * 1024 * 1024 ))
-    elif [[ ${capacity_memory_unit} == "Ki" ]]
-    then
-      capacity_memory=$(( ${capacity_memory_count} * 1024 ))
-    elif [[ ${capacity_memory_unit} == "" ]]
-    then
-      capacity_memory=${capacity_memory_count}
-    else
-      echo "UNKNOWN: unexpected memory unit (${capacity_memory_unit})."
-      exit ${STATE_UNKNOWN}
-    fi
+    capacity_memory=$(convertMemory ${capacity_memory_count} ${capacity_memory_unit})
 
     let nodes_capacity_memory_total+=$capacity_memory
   done
@@ -837,20 +768,13 @@ else
     let nodes_capacity_pods_total+=$capacity_pods
   done
 
-
   # calculate total requested
   nodes_requested_cpu_total=0
   for requested_cpu in ${node_requested_cpu[@]}; do
     requested_cpu_unit=( $(echo "${requested_cpu}" | sed 's/^[0-9]*//g') )
     requested_cpu_count=( $(echo "${requested_cpu}" | sed 's/[a-zA-Z]*$//g') )
 
-    if [[ $requested_cpu_unit == "" ]]
-    then
-      requested_cpu=$(( ${requested_cpu_count} * 1000 ))
-    elif [[ $requested_cpu_unit == "m" ]]
-    then
-      requested_cpu=${requested_cpu_count}
-    fi
+    requested_cpu=$(convertCpu ${requested_cpu_count} ${requested_cpu_unit})
 
     let nodes_requested_cpu_total+=$requested_cpu
   done
@@ -860,22 +784,7 @@ else
     requested_memory_unit=( $(echo "${requested_memory}" | sed 's/^[0-9]*//g') )
     requested_memory_count=( $(echo "${requested_memory}" | sed 's/[a-zA-Z]*$//g') )
 
-    if [[ ${requested_memory_unit} == "Gi" ]]
-    then
-      requested_memory=$(( ${requested_memory_count} * 1024 * 1024 * 1024 ))
-    elif [[ ${requested_memory_unit} == "Mi" ]]
-    then
-      requested_memory=$(( ${requested_memory_count} * 1024 * 1024 ))
-    elif [[ ${requested_memory_unit} == "Ki" ]]
-    then
-      requested_memory=$(( ${requested_memory_count} * 1024 ))
-    elif [[ ${requested_memory_unit} == "" ]]
-    then
-      requested_memory=${requested_memory_count}
-    else
-      echo "UNKNOWN: unexpected memory unit (${requested_memory_unit})."
-      exit ${STATE_UNKNOWN}
-    fi
+    requested_memory=$(convertMemory ${requested_memory_count} ${requested_memory_unit})
 
     let nodes_requested_memory_total+=$requested_memory
   done
