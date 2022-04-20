@@ -493,17 +493,17 @@ else
 
   perf_output="'component_errors'=${#componenterrors[*]};;;; 'cpu'=${requested_cpu}m;;;;${capacity_cpu} 'memory'=${requested_memory}B;;;0;${capacity_memory} 'pods'=${requested_pods};;;;${capacity_pods} 'usage_cpu'=${usage_cpu}%%;${cpu_warn};${cpu_crit};0;100 'usage_memory'=${usage_memory}%%;${memory_warn};${memory_crit};0;100 'usage_pods'=${usage_pods}%%;${pods_warn};${pods_crit};0;100"
 
-  if [[ ${#componenterrors[*]} -gt 0 ]]
+  if [[ ${#componenterrors[*]} -gt 0 && ! -z ${resourceerrors} ]]
+  then
+    printf "CHECK_RANCHER2 CRITICAL - Cluster $clusteralias has resource problems and component errors|'cluster_healthy'=0;;;; ${perf_output}\n${resourceerrors} ${componenterrors[*]}"
+    exit ${STATE_CRITICAL}
+  elif [[ ${#componenterrors[*]} -gt 0 ]]
   then
     printf "CHECK_RANCHER2 CRITICAL - Cluster $clusteralias: ${componenterrors[*]}|'cluster_healthy'=0;;;; ${perf_output}\n${componenterrors[*]}"
     exit ${STATE_CRITICAL}
   elif [[ ! -z ${resourceerrors} ]]
   then
     printf "CHECK_RANCHER2 CRITICAL - Cluster $clusteralias has resource problems|'cluster_healthy'=0;;;; ${perf_output}\n${resourceerrors}"
-    exit ${STATE_CRITICAL}
-  elif [[ ${#componenterrors[*]} -gt 0 ]] && [[ ! -z ${resourceerrors} ]]
-  then
-    printf "CHECK_RANCHER2 CRITICAL - Cluster $clusteralias has resource problems and component errors|'cluster_healthy'=0;;;; ${perf_output}\n${resourceerrors} ${componenterrors[*]}"
     exit ${STATE_CRITICAL}
   else
     printf "CHECK_RANCHER2 OK - Cluster $clusteralias is healthy|'cluster_healthy'=1;;;; ${perf_output}"
@@ -548,9 +548,9 @@ if [[ -z $clustername ]]; then
       then
         if [[ -n $(echo ${ignore} | grep -i ${status}) ]]
         then
-          nodeignored[$i]="${node} in cluster ${node_cluster_member[$i]} is ${node_status[$i]} but ignored -"
+          nodeignored[$i]="${node} in cluster ${node_cluster_member[$i]} is ${node_status[$i]} but ignored \n"
         else
-          nodeerrors[$i]="${node} in cluster ${node_cluster_member[$i]} is ${node_status[$i]} -"
+          nodeerrors[$i]="${node} in cluster ${node_cluster_member[$i]} is ${node_status[$i]} \n"
         fi
       fi
     done
@@ -563,7 +563,7 @@ if [[ -z $clustername ]]; then
     for n in ${node_diskpressure[*]}
     do
       hostid=$(( $n - 1 ))
-      nodeerrors+=("${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} has Disk Pressure -")
+      nodeerrors+=("${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} has Disk Pressure \n")
     done
   fi
 
@@ -572,7 +572,7 @@ if [[ -z $clustername ]]; then
     for n in ${node_memorypressure[*]}
     do
       hostid=$(( $n - 1 ))
-      nodeerrors+=("${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} has Memory Pressure -")
+      nodeerrors+=("${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} has Memory Pressure \n")
     done
   fi
 
@@ -581,7 +581,7 @@ if [[ -z $clustername ]]; then
     for n in ${node_kubeletready[*]}
     do
       hostid=$(( $n - 1 ))
-      nodeerrors+=("Kubelet on node ${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} is not ready -")
+      nodeerrors+=("Kubelet on node ${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} is not ready \n")
     done
   fi
 
@@ -590,7 +590,7 @@ if [[ -z $clustername ]]; then
     for n in ${node_network[*]}
     do
       hostid=$(( $n - 1 ))
-      nodeerrors+=("Network on node ${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} is unavailable -")
+      nodeerrors+=("Network on node ${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} is unavailable \n")
     done
   fi
 
@@ -656,14 +656,14 @@ if [[ -z $clustername ]]; then
   
   if [[ ${#nodeerrors[*]} -gt 0 ]]
   then
-    printf "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|${perf_output}"
+    printf "CHECK_RANCHER2 CRITICAL - ${#nodeerrors[*]} abnormal node states|${perf_output}\n${nodeerrors[*]}${nodeignored[*]}"
     exit ${STATE_CRITICAL}
   elif [[ ${#nodeignored[*]} -gt 0 ]]
   then
-    printf "CHECK_RANCHER2 OK - All nodes OK - Info: ${nodeignored[*]}|${perf_output}"
+    printf "CHECK_RANCHER2 OK - All nodes OK - Info: ${#nodeignored[*]} node errors ignored|${perf_output}\n${nodeerrors[*]}${nodeignored[*]}"
     exit ${STATE_OK}
   else
-    printf "CHECK_RANCHER2 OK - All ${#node_names[*]} nodes are active|${perf_output}"
+    printf "CHECK_RANCHER2 OK - All ${#node_names[*]} nodes are active|${perf_output}\n${nodeerrors[*]}${nodeignored[*]}"
     exit ${STATE_OK}
   fi
 
@@ -705,9 +705,9 @@ else
       then
         if [[ -n $(echo ${ignore} | grep -i ${status}) ]]
 	then
-          nodeignored[$i]="${node} in cluster ${node_cluster_member[$i]} is ${node_status[$i]} but ignored -"
+          nodeignored[$i]="${node} in cluster ${node_cluster_member[$i]} is ${node_status[$i]} but ignored \n"
         else
-          nodeerrors[$i]="${node} in cluster ${clustername} is ${node_status[$i]} -"
+          nodeerrors[$i]="${node} in cluster ${clustername} is ${node_status[$i]} \n"
         fi
       fi
     done
@@ -885,17 +885,17 @@ else
 
   perf_output="'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_cpu_total'=${nodes_requested_cpu_total}m;;;0;${nodes_capacity_cpu_total} 'nodes_memory_total'=${nodes_requested_memory_total}B;;;0;${nodes_capacity_memory_total} 'nodes_pods_total'=${nodes_requested_pods_total};;;0;${nodes_capacity_pods_total} ${node_perf_output}"
 
-  if [[ ${#nodeerrors[*]} -gt 0 ]]
+  if [[ ${#nodeerrors[*]} -gt 0 && ! -z ${resourceerrors} ]]
   then
-    printf "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]}|${perf_output}\n${nodeerrors}"
+    printf "CHECK_RANCHER2 CRITICAL - ${#nodeerrors[*]} abnormal node states and resource problems|${perf_output}\n${resourceerrors}${nodeerrors}${nodeignored[*]}"
+    exit ${STATE_CRITICAL}
+  elif [[ ${#nodeerrors[*]} -gt 0 ]]
+  then
+    printf "CHECK_RANCHER2 CRITICAL - ${#nodeerrors[*]} abnormal node states|${perf_output}\n${resourceerrors}${nodeerrors}${nodeignored[*]}"
     exit ${STATE_CRITICAL}
   elif [[ ! -z ${resourceerrors} ]]
   then
-    printf "CHECK_RANCHER2 CRITICAL - Nodes with resource problems|${perf_output}\n${resourceerrors} ${nodeerrors}"
-    exit ${STATE_CRITICAL}
-  elif [[ ${#nodeerrors[*]} -gt 0 ]] && [[ ! -z ${resourceerrors} ]]
-  then
-    printf "CHECK_RANCHER2 CRITICAL - ${nodeerrors[*]} and resource problems|${perf_output}\n${resourceerrors} ${nodeerrors}"
+    printf "CHECK_RANCHER2 CRITICAL - Nodes with resource problems|${perf_output}\n${resourceerrors}${nodeerrors}${nodeignored[*]}"
     exit ${STATE_CRITICAL}
   elif [[ ${#nodeignored[*]} -gt 0 ]]
   then
