@@ -102,6 +102,9 @@ function convertMemory()
   elif [[ ${memory_unit} == "k" ]]
   then
     memory=$(( ${memory_count} * 1000 ))
+  elif [[ ${memory_unit} == "m" ]]
+  then
+    memory=$(( ${memory_count} / 1000 ))
   elif [[ ${memory_unit} == "" ]]
   then
     memory=$(( ${memory_count} ))
