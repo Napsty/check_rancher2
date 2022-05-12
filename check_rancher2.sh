@@ -993,15 +993,15 @@ else
 
   if [[ ${#nodeerrors[*]} -gt 0 && ! -z ${resourceerrors} ]]
   then
-    printf "CHECK_RANCHER2 CRITICAL - ${#nodeerrors[*]} abnormal node states and resource problems|${perf_output}\n${resourceerrors}${nodeerrors}${nodeignored[*]}"
+    printf "CHECK_RANCHER2 CRITICAL - ${#nodeerrors[*]} abnormal node states and resource problems|${perf_output}\n${nodeerrors[*]}${resourceerrors}${nodeignored[*]}"
     exit ${STATE_CRITICAL}
   elif [[ ${#nodeerrors[*]} -gt 0 ]]
   then
-    printf "CHECK_RANCHER2 CRITICAL - ${#nodeerrors[*]} abnormal node states|${perf_output}\n${resourceerrors}${nodeerrors}${nodeignored[*]}"
+    printf "CHECK_RANCHER2 CRITICAL - ${#nodeerrors[*]} abnormal node states|${perf_output}\n${nodeerrors[*]}${resourceerrors}${nodeignored[*]}"
     exit ${STATE_CRITICAL}
   elif [[ ! -z ${resourceerrors} ]]
   then
-    printf "CHECK_RANCHER2 CRITICAL - Nodes with resource problems|${perf_output}\n${resourceerrors}${nodeerrors}${nodeignored[*]}"
+    printf "CHECK_RANCHER2 CRITICAL - Nodes with resource problems|${perf_output}\n${nodeerrors[*]}${resourceerrors}${nodeignored[*]}"
     exit ${STATE_CRITICAL}
   elif [[ ${#nodeignored[*]} -gt 0 ]]
   then

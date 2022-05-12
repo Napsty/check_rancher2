@@ -1,7 +1,5 @@
 # check_rancher2
 
-(some perf outputs added to parse them to graphite)
-
 Monitoring plugin to check Kubernetes container environments in Rancher 2.x
 
 This is the public repository for development. 
