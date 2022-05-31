@@ -66,47 +66,33 @@ function convertMemory()
   local memory_count=$1
   local memory_unit=$2
   
-  if [[ ${memory_unit} == "Ei" ]]
-  then
+  if [[ ${memory_unit} == "Ei" ]]; then
     memory=$(( ${memory_count} * 1024 * 1024 * 1024 * 1024 * 1024 * 1024 ))
-  elif [[ ${memory_unit} == "E" ]]
-  then
+  elif [[ ${memory_unit} == "E" ]]; then
     memory=$(( ${memory_count} * 1000 * 1000 * 1000 * 1000 * 1000 * 1000 ))
-  elif [[ ${memory_unit} == "Pi" ]]
-  then
+  elif [[ ${memory_unit} == "Pi" ]]; then
     memory=$(( ${memory_count} * 1024 * 1024 * 1024 * 1024 * 1024 ))
-  elif [[ ${memory_unit} == "P" ]]
-  then
+  elif [[ ${memory_unit} == "P" ]]; then
     memory=$(( ${memory_count} * 1000 * 1000 * 1000 * 1000 * 1000 ))
-  elif [[ ${memory_unit} == "Ti" ]]
-  then
+  elif [[ ${memory_unit} == "Ti" ]]; then
     memory=$(( ${memory_count} * 1024 * 1024 * 1024 * 1024 ))
-  elif [[ ${memory_unit} == "T" ]]
-  then
+  elif [[ ${memory_unit} == "T" ]]; then
     memory=$(( ${memory_count} * 1000 * 1000 * 1000 * 1000 ))
-  elif [[ ${memory_unit} == "Gi" ]]
-  then
+  elif [[ ${memory_unit} == "Gi" ]]; then
     memory=$(( ${memory_count} * 1024 * 1024 * 1024 ))
-  elif [[ ${memory_unit} == "G" ]]
-  then
+  elif [[ ${memory_unit} == "G" ]]; then
     memory=$(( ${memory_count} * 1000 * 1000 * 1000 ))
-  elif [[ ${memory_unit} == "Mi" ]]
-  then
+  elif [[ ${memory_unit} == "Mi" ]]; then
     memory=$(( ${memory_count} * 1024 * 1024 ))
-  elif [[ ${memory_unit} == "M" ]]
-  then
+  elif [[ ${memory_unit} == "M" ]]; then
     memory=$(( ${memory_count} * 1000 * 1000 ))
-  elif [[ ${memory_unit} == "Ki" ]]
-  then
+  elif [[ ${memory_unit} == "Ki" ]]; then
     memory=$(( ${memory_count} * 1024 ))
-  elif [[ ${memory_unit} == "k" ]]
-  then
+  elif [[ ${memory_unit} == "k" ]]; then
     memory=$(( ${memory_count} * 1000 ))
-  elif [[ ${memory_unit} == "m" ]]
-  then
+  elif [[ ${memory_unit} == "m" ]]; then
     memory=$(( ${memory_count} / 1000 ))
-  elif [[ ${memory_unit} == "" ]]
-  then
+  elif [[ ${memory_unit} == "" ]]; then
     memory=$(( ${memory_count} ))
   else
     echo "UNKNOWN: unexpected memory unit (${memory_unit})."
@@ -123,12 +109,10 @@ function convertCpu()
   local cpu_unit=$2
   
   # m = milli CPU
-  if [[ ${cpu_unit} == "m" ]]
-  then
+  if [[ ${cpu_unit} == "m" ]]; then
     cpu=${cpu_count}
   # no unit means full cpu
-  elif [[ ${cpu_unit} == "" ]]
-  then
+  elif [[ ${cpu_unit} == "" ]]; then
     cpu=$(( ${cpu_count} * 1000 ))
   else
     echo "UNKNOWN: unexpected cpu unit (${cpu_unit})."
@@ -145,12 +129,10 @@ function convertPods()
   local pods_unit=$2
 
   # k = 1000 pods
-  if [[ ${pods_unit} == "k" ]]
-  then
+  if [[ ${pods_unit} == "k" ]]; then
     pods=$(( ${pods_count} * 1000 ))
   # no unit
-  elif [[ ${pods_unit} == "" ]]
-  then
+  elif [[ ${pods_unit} == "" ]]; then
     pods=${pods_count}
   else
     echo "UNKNOWN: unexpected pods unit (${pods_unit})."
@@ -199,12 +181,10 @@ exit ${STATE_UNKNOWN}
 }
 
 # Check for necessary commands
-for cmd in jq curl [
-do
- if ! `which ${cmd} 1>/dev/null`
- then
- echo "UNKNOWN: ${cmd} does not exist, please check if command exists and PATH is correct"
- exit ${STATE_UNKNOWN}
+for cmd in jq curl; do
+ if ! `which ${cmd} 1>/dev/null`; then
+   echo "UNKNOWN: ${cmd} does not exist, please check if command exists and PATH is correct"
+   exit ${STATE_UNKNOWN}
  fi
 done
 
@@ -219,8 +199,7 @@ fi
 #########################################################################
 # Get user-given variables
 eval set -- "$PARSED_ARGUMENTS"
-while :
-do
+while :; do
   case "$1" in
   -H | --apihost)       apihost=${2}       ; shift 2 ;;
   -U | --apiuser)       apiuser=${2}       ; shift 2 ;;
@@ -248,44 +227,37 @@ do
 done
 #########################################################################
 # Did user obey to usage?
-if [ -z $apihost ]
-then
+if [ -z $apihost ]; then
   echo -e "CHECK_RANCHER2 UNKNOWN - Missing Rancher 2.x API host address"
   exit ${STATE_UNKNOWN}
 fi
 
-if [ -z $apiuser ]
-then
+if [ -z $apiuser ]; then
   echo -e "CHECK_RANCHER2 UNKNOWN - Missing API user"
   exit ${STATE_UNKNOWN}
 fi
 
-if [ -z $apipass ]
-then
+if [ -z $apipass ]; then
   echo -e "CHECK_RANCHER2 UNKNOWN - Missing API password"
   exit ${STATE_UNKNOWN}
 fi
 
-if [ -z $type ]
-then
+if [ -z $type ]; then
   echo -e "CHECK_RANCHER2 UNKNOWN - Missing check type"
   exit ${STATE_UNKNOWN}
 fi
 
-if [[ "$cpu_warn" -gt "$cpu_crit" ]]
-then
+if [[ "$cpu_warn" -gt "$cpu_crit" ]]; then
   echo -e "CHECK_RANCHER2 UNKNOWN - cpu-warn should be lower than cpu-crit"
   exit ${STATE_UNKNOWN}
 fi
 
-if [[ "$memory_warn" -gt "$memory_crit" ]]
-then
+if [[ "$memory_warn" -gt "$memory_crit" ]]; then
   echo -e "CHECK_RANCHER2 UNKNOWN - memory-warn should be lower than memory-crit"
   exit ${STATE_UNKNOWN}
 fi
 
-if [[ "$pods_warn" -gt "$pods_crit" ]]
-then
+if [[ "$pods_warn" -gt "$pods_crit" ]]; then
   echo -e "CHECK_RANCHER2 UNKNOWN - pods-warn should be lower than pods-crit"
   exit ${STATE_UNKNOWN}
 fi
@@ -295,32 +267,25 @@ fi
 apicheck=$(curl -s ${selfsigned} -o /dev/null -w "%{http_code}" -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project")
 
 # Detect failures
-if [[ $apicheck = 000 ]]
-then
+if [[ $apicheck = 000 ]]; then
   echo -e "CHECK_RANCHER2 UNKNOWN - Invalid host address detected: ${apihost}. Use valid IP or DNS name on which the Rancher 2 API is accessible."
   exit ${STATE_UNKNOWN}
-elif [[ $apicheck = 301 ]]
-then
+elif [[ $apicheck = 301 ]]; then
   echo -e "CHECK_RANCHER2 UNKNOWN - Redirect detected. Maybe http to https? Use -S parameter."
   exit ${STATE_UNKNOWN}
-elif [[ $apicheck = 302 ]]
-then
+elif [[ $apicheck = 302 ]]; then
   echo -e "CHECK_RANCHER2 UNKNOWN - Redirect detected. Maybe http to https? Use -S parameter."
   exit ${STATE_UNKNOWN}
-elif [[ $apicheck = 308 ]]
-then
+elif [[ $apicheck = 308 ]]; then
   echo -e "CHECK_RANCHER2 UNKNOWN - Redirect detected. Maybe http to https? Use -S parameter."
   exit ${STATE_UNKNOWN}
-elif [[ $apicheck = 401 ]]
-then
+elif [[ $apicheck = 401 ]]; then
   echo -e "CHECK_RANCHER2 WARNING - Authentication failed"
   exit ${STATE_WARNING}
-elif [[ $apicheck = 403 ]]
-then
+elif [[ $apicheck = 403 ]]; then
   echo -e "CHECK_RANCHER2 CRITICAL - Access to API forbidden"
   exit ${STATE_CRITICAL}
-elif [[ $apicheck -gt 499 ]]
-then
+elif [[ $apicheck -gt 499 ]]; then
   echo -e "CHECK_RANCHER2 CRITICAL - API Returned HTTP $apicheck error"
   exit ${STATE_CRITICAL}
 fi
@@ -344,15 +309,13 @@ declare -a project_names=( $(echo "$api_out_project" | jq -r '.data[].name') )
 #echo ${project_names[*]}   # Enable for debugging
 
 i=0
-for entry in ${cluster_ids[*]}
-do
+for entry in ${cluster_ids[*]}; do
   pretty_clusters[$i]="${entry} alias ${cluster_names[$i]} -"
   let i++
 done
 
 i=0
-for entry in ${project_ids[*]}
-do
+for entry in ${project_ids[*]}; do
   pretty_projects[$i]="${entry} alias ${project_names[$i]} -"
   let i++
 done
@@ -364,8 +327,7 @@ exit ${STATE_OK}
 
 # --- cluster status check --- #
 cluster)
-if [[ -z $clustername ]]
-then
+if [[ -z $clustername ]]; then
 
 # Check status of all clusters
   api_out_clusters=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/clusters")
@@ -373,23 +335,20 @@ then
   declare -a cluster_names=( $(echo "$api_out_clusters" | jq -r '.data[].name') )
   
   e=0
-  for cluster in ${cluster_ids[*]}
-  do
+  for cluster in ${cluster_ids[*]}; do
     #echo $cluster # For Debug
     clusteralias=$(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'")|.name')
     declare -a clusterstate=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'") | .state') )
     declare -a component=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'") | .componentStatuses[].name') )
     declare -a healthstatus=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'") | .componentStatuses[].conditions[].status') )
 
-    if [[ "${clusterstate}" != "active" ]]
-    then
+    if [[ "${clusterstate}" != "active" ]]; then
         componenterrors[$e]="cluster ${clusteralias} is in ${clusterstate} state -"
         clustererrors[$e]="${cluster}"
     fi
 
     c=0
-    for status in ${healthstatus[*]}
-    do
+    for status in ${healthstatus[*]}; do
       if [[ ${status} != True ]]; then 
         componenterrors[$e]="${component[$c]} in cluster ${clusteralias} is not healthy -"
         clustererrors[$e]="${cluster}"
@@ -402,8 +361,7 @@ then
 
   clustererrorcount=$(echo ${clustererrors[*]} | tr ' ' '\n' | sort -u | tr '\n' ' ' | wc -w)
 
-  if [[ ${#componenterrors[*]} -gt 0 ]]
-  then
+  if [[ ${#componenterrors[*]} -gt 0 ]]; then
     echo "CHECK_RANCHER2 CRITICAL - ${componenterrors[*]}|'clusters_total'=${#cluster_ids[*]};;;; 'clusters_errors'=${clustererrorcount};;;;"
     exit ${STATE_CRITICAL}
   else
@@ -417,8 +375,7 @@ else
   api_out_single_cluster=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/clusters/${clustername}")
 
   # Check if that given cluster name exists
-  if [[ -n $(echo "$api_out_single_cluster" | grep -i "NotFound") ]]
-  then
+  if [[ -n $(echo "$api_out_single_cluster" | grep -i "NotFound") ]]; then
     echo "CHECK_RANCHER2 CRITICAL - Cluster $clustername not found. Hint: Use '-t info' to identify cluster and project names."
     exit ${STATE_CRITICAL}
   fi
@@ -480,13 +437,11 @@ else
   # convert requested_pods dependened by unit
   requested_pods=$(convertPods ${requested_pods_count} ${requested_pods_unit})
 
-  if [[ "${clusterstate}" != "active" ]]
-  then
+  if [[ "${clusterstate}" != "active" ]]; then
       componenterrors+="cluster ${clusteralias} is in ${clusterstate} state -"
   fi
   
-  for status in ${healthstatus[*]}
-  do
+  for status in ${healthstatus[*]}; do
     if [[ ${status} != True ]]; then
       componenterrors+="${component[$i]} is not healthy -"
     fi
@@ -499,53 +454,41 @@ else
 
   # threshold checks
   # cpu
-  if [ ! -z $cpu_warn ] || [ ! -z $cpu_crit ]
-  then
-    if [[ "$usage_cpu" -gt "$cpu_crit" ]]
-    then
+  if [ ! -z $cpu_warn ] || [ ! -z $cpu_crit ]; then
+    if [[ "$usage_cpu" -gt "$cpu_crit" ]]; then
       resourceerrors+="CPU usage ${usage_cpu} higher than crit threshold of ${cpu_crit} \n"
-    elif [[ "$usage_cpu" -gt "$cpu_warn" ]]
-    then
+    elif [[ "$usage_cpu" -gt "$cpu_warn" ]]; then
       resourceerrors+="CPU usage ${usage_cpu} higher than warn threshold of ${cpu_warn} \n"
     fi
   fi
 
   # memory
-  if [ ! -z $memory_warn ] || [ ! -z $memory_crit ]
-  then
-    if [[ "$usage_memory" -gt "$memory_crit" ]]
-    then
+  if [ ! -z $memory_warn ] || [ ! -z $memory_crit ]; then
+    if [[ "$usage_memory" -gt "$memory_crit" ]]; then
       resourceerrors+="MEMORY usage ${usage_memory} higher than crit threshold of ${memory_crit} \n"
-    elif [[ "$usage_memory" -gt "$memory_warn" ]]
-    then
+    elif [[ "$usage_memory" -gt "$memory_warn" ]]; then
       resourceerrors+="MEMORY usage ${usage_memory} higher than warn threshold of ${memory_warn} \n"
     fi
   fi
 
   # pods
-  if [ ! -z $pods_warn ] || [ ! -z $pods_crit ]
-  then
-    if [[ "$usage_pods" -gt "$pods_crit" ]]
-    then
+  if [ ! -z $pods_warn ] || [ ! -z $pods_crit ]; then
+    if [[ "$usage_pods" -gt "$pods_crit" ]]; then
       resourceerrors+="PODS Usage ${usage_pods} higher than crit threshold of ${pods_crit} \n"
-    elif [[ "$usage_pods" -gt "$pods_warn" ]]
-    then
+    elif [[ "$usage_pods" -gt "$pods_warn" ]]; then
       resourceerrors+="PODS Usage ${usage_pods} higher than warn threshold of ${pods_warn} \n"
     fi
   fi
 
   perf_output="'component_errors'=${#componenterrors[*]};;;; 'cpu'=${requested_cpu};;;;${capacity_cpu} 'memory'=${requested_memory}B;;;0;${capacity_memory} 'pods'=${requested_pods};;;;${capacity_pods} 'usage_cpu'=${usage_cpu}%%;${cpu_warn};${cpu_crit};0;100 'usage_memory'=${usage_memory}%%;${memory_warn};${memory_crit};0;100 'usage_pods'=${usage_pods}%%;${pods_warn};${pods_crit};0;100"
 
-  if [[ ${#componenterrors[*]} -gt 0 && ! -z ${resourceerrors} ]]
-  then
+  if [[ ${#componenterrors[*]} -gt 0 && ! -z ${resourceerrors} ]]; then
     printf "CHECK_RANCHER2 CRITICAL - Cluster $clusteralias has resource problems and component errors|'cluster_healthy'=0;;;; ${perf_output}\n${resourceerrors} ${componenterrors[*]}"
     exit ${STATE_CRITICAL}
-  elif [[ ${#componenterrors[*]} -gt 0 ]]
-  then
+  elif [[ ${#componenterrors[*]} -gt 0 ]]; then
     printf "CHECK_RANCHER2 CRITICAL - Cluster $clusteralias: ${componenterrors[*]}|'cluster_healthy'=0;;;; ${perf_output}\n${componenterrors[*]}"
     exit ${STATE_CRITICAL}
-  elif [[ ! -z ${resourceerrors} ]]
-  then
+  elif [[ ! -z ${resourceerrors} ]]; then
     printf "CHECK_RANCHER2 CRITICAL - Cluster $clusteralias has resource problems|'cluster_healthy'=0;;;; ${perf_output}\n${resourceerrors}"
     exit ${STATE_CRITICAL}
   else
@@ -583,14 +526,10 @@ if [[ -z $clustername ]]; then
 
   # Check node status (user controlled)
   i=0
-  for node in ${node_names[*]}
-  do
-    for status in ${node_status[$i]}
-    do
-      if [[ ${status} != active ]]
-      then
-        if [[ -n $(echo ${ignore} | grep -i ${status}) ]]
-        then
+  for node in ${node_names[*]}; do
+    for status in ${node_status[$i]}; do
+      if [[ ${status} != active ]]; then
+        if [[ -n $(echo ${ignore} | grep -i ${status}) ]]; then
           nodeignored[$i]="${node} in cluster ${node_cluster_member[$i]} is ${node_status[$i]} but ignored \n"
         else
           nodeerrors[$i]="${node} in cluster ${node_cluster_member[$i]} is ${node_status[$i]} \n"
@@ -601,37 +540,29 @@ if [[ -z $clustername ]]; then
   done
 
   # Handle node pressure situations and other conditions (Kubernetes controlled)
-  if [[ ${#node_diskpressure[*]} -gt 0 ]]
-  then
-    for n in ${node_diskpressure[*]}
-    do
+  if [[ ${#node_diskpressure[*]} -gt 0 ]]; then
+    for n in ${node_diskpressure[*]}; do
       hostid=$(( $n - 1 ))
       nodeerrors+=("${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} has Disk Pressure \n")
     done
   fi
 
-  if [[ ${#node_memorypressure[*]} -gt 0 ]]
-  then
-    for n in ${node_memorypressure[*]}
-    do
+  if [[ ${#node_memorypressure[*]} -gt 0 ]]; then
+    for n in ${node_memorypressure[*]}; do
       hostid=$(( $n - 1 ))
       nodeerrors+=("${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} has Memory Pressure \n")
     done
   fi
 
-  if [[ ${#node_kubeletready[*]} -gt 0 ]]
-  then
-    for n in ${node_kubeletready[*]}
-    do
+  if [[ ${#node_kubeletready[*]} -gt 0 ]]; then
+    for n in ${node_kubeletready[*]}; do
       hostid=$(( $n - 1 ))
       nodeerrors+=("Kubelet on node ${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} is not ready \n")
     done
   fi
 
-  if [[ ${#node_network[*]} -gt 0 ]]
-  then
-    for n in ${node_network[*]}
-    do
+  if [[ ${#node_network[*]} -gt 0 ]]; then
+    for n in ${node_network[*]}; do
       hostid=$(( $n - 1 ))
       nodeerrors+=("Network on node ${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} is unavailable \n")
     done
@@ -639,8 +570,7 @@ if [[ -z $clustername ]]; then
 
   # calculate total capacities
   nodes_capacity_cpu_total=0
-  for capacity_cpu in ${node_capacity_cpu[@]}
-  do
+  for capacity_cpu in ${node_capacity_cpu[@]}; do
     # split capacity_cpu
     capacity_cpu_unit=( $(echo "${capacity_cpu}" | sed 's/^[0-9]*//g') )
     capacity_cpu_count=( $(echo "${capacity_cpu}" | sed 's/[a-zA-Z]*$//g') )
@@ -652,8 +582,7 @@ if [[ -z $clustername ]]; then
   done
 
   nodes_capacity_memory_total=0
-  for capacity_memory in ${node_capacity_memory[@]}
-  do
+  for capacity_memory in ${node_capacity_memory[@]}; do
     # split capacity_memory
     capacity_memory_unit=( $(echo "${capacity_memory}" | sed 's/^[0-9]*//g') )
     capacity_memory_count=( $(echo "${capacity_memory}" | sed 's/[a-zA-Z]*$//g') )
@@ -665,8 +594,7 @@ if [[ -z $clustername ]]; then
   done
 
   nodes_capacity_pods_total=0
-  for capacity_pods in ${node_capacity_pods[@]}
-  do
+  for capacity_pods in ${node_capacity_pods[@]}; do
     # split capacity_pods
     capacity_pods_unit=( $(echo "${capacity_pods}" | sed 's/^[0-9]*//g') )
     capacity_pods_count=( $(echo "${capacity_pods}" | sed 's/[a-zA-Z]*$//g') )
@@ -679,8 +607,7 @@ if [[ -z $clustername ]]; then
 
   # calculate total requested
   nodes_requested_cpu_total=0
-  for requested_cpu in ${node_requested_cpu[@]}
-  do
+  for requested_cpu in ${node_requested_cpu[@]}; do
     # split requested_cpu
     requested_cpu_unit=( $(echo "${requested_cpu}" | sed 's/^[0-9]*//g') )
     requested_cpu_count=( $(echo "${requested_cpu}" | sed 's/[a-zA-Z]*$//g') )
@@ -692,8 +619,7 @@ if [[ -z $clustername ]]; then
   done
 
   nodes_requested_memory_total=0
-  for requested_memory in ${node_requested_memory[@]}
-  do
+  for requested_memory in ${node_requested_memory[@]}; do
     # split requested_memory
     requested_memory_unit=( $(echo "${requested_memory}" | sed 's/^[0-9]*//g') )
     requested_memory_count=( $(echo "${requested_memory}" | sed 's/[a-zA-Z]*$//g') )
@@ -705,8 +631,7 @@ if [[ -z $clustername ]]; then
   done
 
   nodes_requested_pods_total=0
-  for requested_pods in ${node_requested_pods[@]}
-  do
+  for requested_pods in ${node_requested_pods[@]}; do
     # split requested_pods
     requested_pods_unit=( $(echo "${requested_pods}" | sed 's/^[0-9]*//g') )
     requested_pods_count=( $(echo "${requested_pods}" | sed 's/[a-zA-Z]*$//g') )
@@ -719,12 +644,10 @@ if [[ -z $clustername ]]; then
 
   perf_output="'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_cpu_total'=${nodes_requested_cpu_total};;;0;${nodes_capacity_cpu_total} 'nodes_memory_total'=${nodes_requested_memory_total}B;;;0;${nodes_capacity_memory_total} 'nodes_pods_total'=${nodes_requested_pods_total};;;0;${nodes_capacity_pods_total}"
   
-  if [[ ${#nodeerrors[*]} -gt 0 ]]
-  then
+  if [[ ${#nodeerrors[*]} -gt 0 ]]; then
     printf "CHECK_RANCHER2 CRITICAL - ${#nodeerrors[*]} abnormal node states|${perf_output}\n${nodeerrors[*]}${nodeignored[*]}"
     exit ${STATE_CRITICAL}
-  elif [[ ${#nodeignored[*]} -gt 0 ]]
-  then
+  elif [[ ${#nodeignored[*]} -gt 0 ]]; then
     printf "CHECK_RANCHER2 OK - All nodes OK - Info: ${#nodeignored[*]} node errors ignored|${perf_output}\n${nodeerrors[*]}${nodeignored[*]}"
     exit ${STATE_OK}
   else
@@ -752,8 +675,7 @@ else
   declare -a node_requested_pods=( $(echo "$api_out_nodes" | jq -r '.data[].requested.pods' ) )
 
   # Check if that given cluster name exists
-  if [[ -n $(echo "$api_out_nodes" | grep -i "NotFound") ]]
-  then
+  if [[ -n $(echo "$api_out_nodes" | grep -i "NotFound") ]]; then
     echo "CHECK_RANCHER2 CRITICAL - Cluster $clustername not found. Hint: Use '-t info' to identify cluster and project names."; exit ${STATE_CRITICAL}
   fi
 
@@ -762,14 +684,10 @@ else
 
   # Check node status (user controlled)
   i=0
-  for node in ${node_names[*]}
-  do
-    for status in ${node_status[$i]}
-    do
-      if [[ ${status} != active ]]
-      then
-        if [[ -n $(echo ${ignore} | grep -i ${status}) ]]
-	then
+  for node in ${node_names[*]}; do
+    for status in ${node_status[$i]}; do
+      if [[ ${status} != active ]]; then
+        if [[ -n $(echo ${ignore} | grep -i ${status}) ]]; then
           nodeignored[$i]="${node} in cluster ${node_cluster_member[$i]} is ${node_status[$i]} but ignored \n"
         else
           nodeerrors[$i]="${node} in cluster ${clustername} is ${node_status[$i]} \n"
@@ -781,8 +699,7 @@ else
     
   # check capacities per node 
   i=0
-  for node in ${node_names[*]}
-  do
+  for node in ${node_names[*]}; do
     # split node_capacity_cpu
     node_capacity_cpu_unit=( $(echo "${node_capacity_cpu[$i]}" | sed 's/^[0-9]*//g') )
     node_capacity_cpu_count=( $(echo "${node_capacity_cpu[$i]}" | sed 's/[a-zA-Z]*$//g') )
@@ -834,37 +751,28 @@ else
 
   # threshold checks
   # cpu
-  if [ ! -z $cpu_warn ] || [ ! -z $cpu_crit ]
-  then
-    if [[ "$usage_cpu" -gt "$cpu_crit" ]]
-    then
+  if [ ! -z $cpu_warn ] || [ ! -z $cpu_crit ]; then
+    if [[ "$usage_cpu" -gt "$cpu_crit" ]]; then
       resourceerrors+="${node} - CPU usage ${usage_cpu} higher than crit threshold of ${cpu_crit} \n"
-    elif [[ "$usage_cpu" -gt "$cpu_warn" ]]
-    then
+    elif [[ "$usage_cpu" -gt "$cpu_warn" ]]; then
       resourceerrors+="${node} - CPU usage ${usage_cpu} higher than warn threshold of ${cpu_warn} \n"
     fi
   fi
 
   # memory
-  if [ ! -z $memory_warn ] || [ ! -z $memory_crit ]
-  then
-    if [[ "$usage_memory" -gt "$memory_crit" ]]
-    then
+  if [ ! -z $memory_warn ] || [ ! -z $memory_crit ]; then
+    if [[ "$usage_memory" -gt "$memory_crit" ]]; then
       resourceerrors+="${node} - MEMORY usage ${usage_memory} higher than crit threshold of ${memory_crit} \n"
-    elif [[ "$usage_memory" -gt "$memory_warn" ]]
-    then
+    elif [[ "$usage_memory" -gt "$memory_warn" ]]; then
       resourceerrors+="${node} - MEMORY usage ${usage_memory} higher than warn threshold of ${memory_warn} \n"
     fi
   fi
 
   # pods
-  if [ ! -z $pods_warn ] || [ ! -z $pods_crit ]
-  then
-    if [[ "$usage_pods" -gt "$pods_crit" ]]
-    then
+  if [ ! -z $pods_warn ] || [ ! -z $pods_crit ]; then
+    if [[ "$usage_pods" -gt "$pods_crit" ]]; then
       resourceerrors+="${node} - PODS Usage ${usage_pods} higher than crit threshold of ${pods_crit} \n"
-    elif [[ "$usage_pods" -gt "$pods_warn" ]]
-    then
+    elif [[ "$usage_pods" -gt "$pods_warn" ]]; then
       resourceerrors+="${node} - PODS Usage ${usage_pods} higher than warn threshold of ${pods_warn} \n"
     fi
   fi
@@ -873,37 +781,29 @@ else
   done
 
   # Handle node pressure situations and other conditions (Kubernetes controlled)
-  if [[ ${#node_diskpressure[*]} -gt 0 ]]
-  then
-    for n in ${node_diskpressure[*]}
-    do
+  if [[ ${#node_diskpressure[*]} -gt 0 ]]; then
+    for n in ${node_diskpressure[*]}; do
       hostid=$(( $n - 1 ))
       nodeerrors+=("${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} has Disk Pressure \n")
     done
   fi
 
-  if [[ ${#node_memorypressure[*]} -gt 0 ]]
-  then
-    for n in ${node_memorypressure[*]}
-    do
+  if [[ ${#node_memorypressure[*]} -gt 0 ]]; then
+    for n in ${node_memorypressure[*]}; do
       hostid=$(( $n - 1 ))
       nodeerrors+=("${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} has Memory Pressure \n")
     done
   fi
 
-  if [[ ${#node_kubeletready[*]} -gt 0 ]]
-  then
-    for n in ${node_kubeletready[*]}
-    do
+  if [[ ${#node_kubeletready[*]} -gt 0 ]]; then
+    for n in ${node_kubeletready[*]}; do
       hostid=$(( $n - 1 ))
       nodeerrors+=("Kubelet on node ${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} is not ready \n")
     done
   fi
 
-  if [[ ${#node_network[*]} -gt 0 ]]
-  then
-    for n in ${node_network[*]}
-    do
+  if [[ ${#node_network[*]} -gt 0 ]]; then
+    for n in ${node_network[*]}; do
       hostid=$(( $n - 1 ))
       nodeerrors+=("Network on node ${node_names[$hostid]} in cluster ${node_cluster_member[$hostid]} is unavailable \n")
     done
@@ -911,8 +811,7 @@ else
 
   # calculate total capacities
   nodes_capacity_cpu_total=0
-  for capacity_cpu in ${node_capacity_cpu[@]}
-  do
+  for capacity_cpu in ${node_capacity_cpu[@]}; do
     # split capacity_cpu
     capacity_cpu_unit=( $(echo "${capacity_cpu}" | sed 's/^[0-9]*//g') )
     capacity_cpu_count=( $(echo "${capacity_cpu}" | sed 's/[a-zA-Z]*$//g') )
@@ -924,8 +823,7 @@ else
   done
 
   nodes_capacity_memory_total=0
-  for capacity_memory in ${node_capacity_memory[@]}
-  do
+  for capacity_memory in ${node_capacity_memory[@]}; do
     # split capacity_memory
     capacity_memory_unit=( $(echo "${capacity_memory}" | sed 's/^[0-9]*//g') )
     capacity_memory_count=( $(echo "${capacity_memory}" | sed 's/[a-zA-Z]*$//g') )
@@ -937,8 +835,7 @@ else
   done
 
   nodes_capacity_pods_total=0
-  for capacity_pods in ${node_capacity_pods[@]}
-  do
+  for capacity_pods in ${node_capacity_pods[@]}; do
     # split capacity_pods
     capacity_pods_unit=( $(echo "${capacity_pods}" | sed 's/^[0-9]*//g') )
     capacity_pods_count=( $(echo "${capacity_pods}" | sed 's/[a-zA-Z]*$//g') )
@@ -951,8 +848,7 @@ else
 
   # calculate total requested
   nodes_requested_cpu_total=0
-  for requested_cpu in ${node_requested_cpu[@]}
-  do
+  for requested_cpu in ${node_requested_cpu[@]}; do
     # split requested_cpu
     requested_cpu_unit=( $(echo "${requested_cpu}" | sed 's/^[0-9]*//g') )
     requested_cpu_count=( $(echo "${requested_cpu}" | sed 's/[a-zA-Z]*$//g') )
@@ -964,8 +860,7 @@ else
   done
 
   nodes_requested_memory_total=0
-  for requested_memory in ${node_requested_memory[@]}
-  do
+  for requested_memory in ${node_requested_memory[@]}; do
     # split requested_memory
     requested_memory_unit=( $(echo "${requested_memory}" | sed 's/^[0-9]*//g') )
     requested_memory_count=( $(echo "${requested_memory}" | sed 's/[a-zA-Z]*$//g') )
@@ -977,8 +872,7 @@ else
   done
 
   nodes_requested_pods_total=0
-  for requested_pods in ${node_requested_pods[@]}
-  do
+  for requested_pods in ${node_requested_pods[@]}; do
     # split requested_pods
     requested_pods_unit=( $(echo "${requested_pods}" | sed 's/^[0-9]*//g') )
     requested_pods_count=( $(echo "${requested_pods}" | sed 's/[a-zA-Z]*$//g') )
@@ -991,20 +885,16 @@ else
 
   perf_output="'nodes_total'=${#node_names[*]};;;; 'node_errors'=${#nodeerrors[*]};;;; 'node_ignored'=${#nodeignored[*]};;;; 'nodes_cpu_total'=${nodes_requested_cpu_total};;;0;${nodes_capacity_cpu_total} 'nodes_memory_total'=${nodes_requested_memory_total}B;;;0;${nodes_capacity_memory_total} 'nodes_pods_total'=${nodes_requested_pods_total};;;0;${nodes_capacity_pods_total} ${node_perf_output}"
 
-  if [[ ${#nodeerrors[*]} -gt 0 && ! -z ${resourceerrors} ]]
-  then
+  if [[ ${#nodeerrors[*]} -gt 0 && ! -z ${resourceerrors} ]]; then
     printf "CHECK_RANCHER2 CRITICAL - ${#nodeerrors[*]} abnormal node states and resource problems|${perf_output}\n${nodeerrors[*]}${resourceerrors}${nodeignored[*]}"
     exit ${STATE_CRITICAL}
-  elif [[ ${#nodeerrors[*]} -gt 0 ]]
-  then
+  elif [[ ${#nodeerrors[*]} -gt 0 ]]; then
     printf "CHECK_RANCHER2 CRITICAL - ${#nodeerrors[*]} abnormal node states|${perf_output}\n${nodeerrors[*]}${resourceerrors}${nodeignored[*]}"
     exit ${STATE_CRITICAL}
-  elif [[ ! -z ${resourceerrors} ]]
-  then
+  elif [[ ! -z ${resourceerrors} ]]; then
     printf "CHECK_RANCHER2 CRITICAL - Nodes with resource problems|${perf_output}\n${nodeerrors[*]}${resourceerrors}${nodeignored[*]}"
     exit ${STATE_CRITICAL}
-  elif [[ ${#nodeignored[*]} -gt 0 ]]
-  then
+  elif [[ ${#nodeignored[*]} -gt 0 ]]; then
     printf "CHECK_RANCHER2 OK - All nodes OK - Info: ${nodeignored[*]}|${perf_output}"
     exit ${STATE_OK}
   else
@@ -1018,8 +908,7 @@ fi
 
 # --- project status check --- #
 project)
-if [[ -z $projectname ]]
-then
+if [[ -z $projectname ]]; then
 
 # Check status of all projects
   api_out_project=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project")
@@ -1029,17 +918,14 @@ then
   declare -a healthstatus=( $(echo "$api_out_project" | jq -r '.data[].state') )
   
   i=0
-  for project in ${project_ids[*]}
-  do
-    if [[ ${healthstatus[$i]} != "active" ]]
-    then
+  for project in ${project_ids[*]}; do
+    if [[ ${healthstatus[$i]} != "active" ]]; then
       projecterrors[$i]="${project} in cluster ${cluster_ids[$i]} is not healthy (state = ${healthstatus[$i]})"
     fi
     let i++
   done
 
-  if [[ ${#projecterrors[*]} -gt 0 ]]
-  then
+  if [[ ${#projecterrors[*]} -gt 0 ]]; then
     printf "CHECK_RANCHER2 CRITICAL - ${projecterrors[*]}|'projects_total'=${#project_ids[*]};;;; 'project_errors'=${#projecterrors[*]};;;;"
     exit ${STATE_CRITICAL}
   else
@@ -1053,14 +939,13 @@ else
   api_out_single_project=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}")
 
   # Check if that given project name exists
-  if [[ -n $(echo "$api_out_single_project" | grep -i "NotFound") ]]
-    then echo "CHECK_RANCHER2 CRITICAL - Project $projectname not found. Hint: Use '-t info' to identify cluster and project names."; exit ${STATE_CRITICAL}
+  if [[ -n $(echo "$api_out_single_project" | grep -i "NotFound") ]]; then
+    echo "CHECK_RANCHER2 CRITICAL - Project $projectname not found. Hint: Use '-t info' to identify cluster and project names."; exit ${STATE_CRITICAL}
   fi
 
   healthstatus=$(echo "$api_out_single_project" | jq -r '.state')
   
-  if [[ ${healthstatus} != active ]]
-  then
+  if [[ ${healthstatus} != active ]]; then
     printf "CHECK_RANCHER2 CRITICAL - Project $projectname is not active|'project_active'=0;;;; 'project_error'=1;;;;"
     exit ${STATE_CRITICAL}
   else
@@ -1078,20 +963,17 @@ service)
 ;;
 
 workload)
-if [ -z $projectname ]
-then
+if [ -z $projectname ]; then
   echo -e "CHECK_RANCHER2 UNKNOWN - To check workloads you must also define the project (-p). This will check all workloads within the given project. To check a specific workload, define it with -w."
   exit ${STATE_UNKNOWN}
 fi
 
-if [[ -z $workloadname ]]
-then
+if [[ -z $workloadname ]]; then
 
 # Check status of all workloads within a project (project must be given)
   api_out_workloads=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}/workloads")
 
-  if [[ -n $(echo "$api_out_workloads" | grep -i "ClusterUnavailable") ]]
-  then
+  if [[ -n $(echo "$api_out_workloads" | grep -i "ClusterUnavailable") ]]; then
     clustername=$(echo ${projectname} | awk -F':' '{print $1}')
     printf "CHECK_RANCHER2 CRITICAL - Cluster $clustername not found. Hint: Use '-t info' to identify cluster and project names."
     exit ${STATE_CRITICAL}
@@ -1102,46 +984,36 @@ then
   declare -a pausedstatus=( $(echo "$api_out_workloads" | jq -r '.data[].paused') )
 
   # We rather WARN than silently return OK for zero workloads
-  if [[ ${#workload_names} -eq 0 ]]
-  then
+  if [[ ${#workload_names} -eq 0 ]]; then
     printf "CHECK_RANCHER2 WARNING - No workloads found in project ${projectname}."
     exit ${STATE_WARNING}
   fi
  
   i=0
-  for workload in ${workload_names[*]}
-  do
-    for status in ${healthstatus[$i]}
-    do
-      if [[ ${status} = updating ]]
-      then
+  for workload in ${workload_names[*]}; do
+    for status in ${healthstatus[$i]}; do
+      if [[ ${status} = updating ]]; then
         workloadwarnings[$i]="Workload ${workload} is ${status} -"
-      elif [[ ${status} != active ]]
-      then
+      elif [[ ${status} != active ]]; then
         workloaderrors[$i]="Workload ${workload} is ${status} -"
       fi
     done
-    for paused in ${pausedstatus[$i]}
-    do
-      if [[ ${paused} = true ]]
-      then
+    for paused in ${pausedstatus[$i]}; do
+      if [[ ${paused} = true ]]; then
         workloadpaused[$i]="${workload} "
       fi
     done
     let i++
   done
 
-  if [[ ${#workloaderrors[*]} -gt 0 ]]
-  then
+  if [[ ${#workloaderrors[*]} -gt 0 ]]; then
     printf  "CHECK_RANCHER2 CRITICAL - ${#workloaderrors[*]} workload(s) in error state|'workloads_total'=${#workload_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;; 'workloads_warnings'=${#workloadwarnings[*]};;;; 'workloads_paused'=${#workloadpaused[*]};;;;\n${workloaderrors[*]}"
     exit ${STATE_CRITICAL}
-  elif [[ ${#workloadwarnings[*]} -gt 0 ]]
-  then
+  elif [[ ${#workloadwarnings[*]} -gt 0 ]]; then
     printf "CHECK_RANCHER2 WARNING - ${#workloadwarnings[*]} workload(s) in warning state|'workloads_total'=${#workload_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;; 'workloads_warnings'=${#workloadwarnings[*]};;;; 'workloads_paused'=${#workloadpaused[*]};;;;\n${workloadwarnings[*]}"
     exit ${STATE_WARNING}
   else
-    if [[ ${#workloadpaused[*]} -gt 0 ]]
-    then
+    if [[ ${#workloadpaused[*]} -gt 0 ]]; then
       echo "CHECK_RANCHER2 OK - All workloads (${#workload_names[*]}) in project ${projectname} are healthy/active ( Note: ${#workloadpaused[*]} workloads currently paused: ${workloadpaused[*]})|'workloads_total'=${#workload_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;; 'workloads_warnings'=${#workloadwarnings[*]};;;; 'workloads_paused'=${#workloadpaused[*]};;;;"
     else
       echo "CHECK_RANCHER2 OK - All workloads (${#workload_names[*]}) in project ${projectname} are healthy/active|'workloads_total'=${#workload_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;; 'workloads_warnings'=${#workloadwarnings[*]};;;; 'workloads_paused'=${#workloadpaused[*]};;;;"
@@ -1152,41 +1024,35 @@ then
 else
  
 # Check status of a single workload
-  if [[ -n $namespacename && $namespacename != "" ]]
-  then
+  if [[ -n $namespacename && $namespacename != "" ]]; then
     nsappend="&namespaceId=$namespacename"
   fi
 
   api_out_single_workload=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}/workloads/?name=${workloadname}${nsappend}")
 
-  if [[ -n $(echo "$api_out_single_workload" | grep -i "ClusterUnavailable") ]]
-  then
+  if [[ -n $(echo "$api_out_single_workload" | grep -i "ClusterUnavailable") ]]; then
     clustername=$(echo ${projectname} | awk -F':' '{print $1}')
     echo "CHECK_RANCHER2 CRITICAL - Cluster $clustername not found. Hint: Use '-t info' to identify cluster and project names."; exit ${STATE_CRITICAL}
   fi
 
   # Check if that given project name exists
-  if [[ -z $(echo "$api_out_single_workload" | grep -i "containers") ]]
-  then
+  if [[ -z $(echo "$api_out_single_workload" | grep -i "containers") ]]; then
     echo "CHECK_RANCHER2 CRITICAL - Workload $workloadname not found."; exit ${STATE_CRITICAL}
   fi
 
   # Check if there are multiple workloads with the same name
   workloadcount=$(echo "$api_out_single_workload" | jq -r '.data[].id' | wc -l)
-  if [[ $workloadcount -gt 1 ]]
-  then
+  if [[ $workloadcount -gt 1 ]]; then
     echo "CHECK_RANCHER2 UNKNOWN - Identical workload names detected in multiple namespaces. To check a specific workload you must also define the namespace (-n)."
     exit ${STATE_CRITICAL}
   fi
 
   healthstatus=$(echo "$api_out_single_workload" | jq -r '.data[].state')
   
-  if [[ ${healthstatus} = updating ]]
-  then
+  if [[ ${healthstatus} = updating ]]; then
     echo "CHECK_RANCHER2 WARNING - Workload $workloadname is ${healthstatus}|'workload_active'=0;;;; 'workload_error'=0;;;; 'workload_warning'=1;;;;"
     exit ${STATE_WARNING}
-  elif [[ ${healthstatus} != active ]]
-  then
+  elif [[ ${healthstatus} != active ]]; then
     echo "CHECK_RANCHER2 CRITICAL - Workload $workloadname is ${healthstatus}|'workload_active'=0;;;; 'workload_error'=1;;;; 'workload_warning'=0;;;;"
     exit ${STATE_CRITICAL}
   else
@@ -1199,26 +1065,22 @@ fi
 
 # --- pod status check (requires project) --- #
 pod)
-if [ -z $projectname ]
-then
+if [ -z $projectname ]; then
   echo -e "CHECK_RANCHER2 UNKNOWN - To check pods you must also define the project (-p). This will check all pods within the given project. To check a specific pod, define it with -o podname and -n namespace."
   exit ${STATE_UNKNOWN}
 fi
 
-if [[ -z $podname ]]
-then
+if [[ -z $podname ]]; then
 
 # Check status of all pods within a project (project must be given)
-  if [[ -n $namespacename && $namespacename != "" ]]
-  then
+  if [[ -n $namespacename && $namespacename != "" ]]; then
     nsappend="?namespaceId=$namespacename"
     outputappend="and namespace $namespacename "
   fi
 
   api_out_pods=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}/pods${nsappend}")
 
-  if [[ -n $(echo "$api_out_pods" | grep -i "ClusterUnavailable") ]]
-  then
+  if [[ -n $(echo "$api_out_pods" | grep -i "ClusterUnavailable") ]]; then
     clustername=$(echo ${projectname} | awk -F':' '{print $1}')
     echo "CHECK_RANCHER2 CRITICAL - Cluster $clustername not found. Hint: Use '-t info' to identify cluster and project names."
     exit ${STATE_CRITICAL}
@@ -1228,27 +1090,22 @@ then
   declare -a healthstatus=( $(echo "$api_out_pods" | jq -r '.data[].state') )
 
   # We rather WARN than silently return OK for zero pods
-  if [[ ${#pod_names} -eq 0 ]]
-  then
+  if [[ ${#pod_names} -eq 0 ]]; then
     echo "CHECK_RANCHER2 WARNING - No pods found in project ${projectname}."
     exit ${STATE_WARNING}
   fi
 
   i=0
-  for pod in ${pod_names[*]}
-  do
-    for status in ${healthstatus[$i]}
-    do
-      if [[ ${status} != running && ${status} != succeeded ]]
-      then
+  for pod in ${pod_names[*]}; do
+    for status in ${healthstatus[$i]}; do
+      if [[ ${status} != running && ${status} != succeeded ]]; then
         poderrors[$i]="Pod ${pod} is ${status}\n"
       fi
     done
     let i++
   done
 
-  if [[ ${#poderrors[*]} -gt 0 ]]
-  then
+  if [[ ${#poderrors[*]} -gt 0 ]]; then
     printf "CHECK_RANCHER2 CRITICAL - ${#poderrors[*]} pod(s) in project ${projectname} ${outputappend}in abnormal state|'pods_total'=${#pod_names[*]};;;; 'pods_errors'=${#poderrors[*]};;;;\n${poderrors[*]}"
     exit ${STATE_CRITICAL}
   else
@@ -1259,30 +1116,26 @@ then
 else
 # Check status of a single pod (requires project and namespace)
 # Note: This only makes sense when you create static pods!
-  if [ -z $namespacename ]
-  then
+  if [ -z $namespacename ]; then
     echo -e "CHECK_RANCHER2 UNKNOWN - To check a single pod you must also define the namespace (-n)."
     exit ${STATE_UNKNOWN}
   fi
   
   api_out_single_pod=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}/pods/${namespacename}:${podname}")
 
-  if [[ -n $(echo "$api_out_single_pod" | grep -i "ClusterUnavailable") ]]
-  then
+  if [[ -n $(echo "$api_out_single_pod" | grep -i "ClusterUnavailable") ]]; then
     clustername=$(echo ${projectname} | awk -F':' '{print $1}')
     echo "CHECK_RANCHER2 CRITICAL - Cluster $clustername not found. Hint: Use '-t info' to identify cluster and project names."; exit ${STATE_CRITICAL}
   fi
 
   # Check if that given project name exists
-  if [[ -z $(echo "$api_out_single_pod" | grep -i "containers") ]]
-  then
+  if [[ -z $(echo "$api_out_single_pod" | grep -i "containers") ]]; then
     echo "CHECK_RANCHER2 CRITICAL - Pod $podname not found. Verify project (-p) and pod (-o) names."; exit ${STATE_CRITICAL}
   fi
 
   healthstatus=$(echo "$api_out_single_pod" | jq -r '.state')
 
-  if [[ ${healthstatus} != running ]]
-  then
+  if [[ ${healthstatus} != running ]]; then
     echo "CHECK_RANCHER2 CRITICAL - Pod $podname is ${healthstatus}|'pod_active'=0;;;; 'pod_error'=1;;;;"
     exit ${STATE_CRITICAL}
   else
