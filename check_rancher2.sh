@@ -20,7 +20,7 @@
 #                                                                                        #
 # Copyright 2018-2022 Claudio Kuenzler                                                   #
 # Copyright 2020 Matthias Kneer                                                          #
-# Copyright 2021,2022 Steffen Eichler                                                         #
+# Copyright 2021,2022 Steffen Eichler                                                    #
 # Copyright 2021 lopf                                                                    #
 #                                                                                        #
 # History:                                                                               #
@@ -61,7 +61,7 @@ version=1.8.0
 # functions
 
 # https://kubernetes.io/docs/reference/kubernetes-api/common-definitions/quantity/
-# convert memory to smallest possible value byte depending by unit
+# convert memory to smallest possible value byte depending on unit
 function convertMemory()
 {
   local memory_count=$1
@@ -103,7 +103,7 @@ function convertMemory()
   printf $memory
 }
 
-# convert cpu to smallest possible value (m = milli CPU) depended by unit
+# convert cpu to smallest possible value (m = milli CPU) depending on unit
 function convertCpu()
 {
   local cpu_count=$1
@@ -123,7 +123,7 @@ function convertCpu()
   printf $cpu
 }
 
-# convert pod to smallest possible value (one pod) dependened by unit
+# convert pod to smallest possible value (one pod) depending on unit
 function convertPods()
 {
   local pods_count=$1
@@ -400,42 +400,42 @@ else
   capacity_cpu_unit=( $(echo "${capacity_cpu}" | sed 's/^[0-9]*//g') )
   capacity_cpu_count=( $(echo "${capacity_cpu}" | sed 's/[a-zA-Z]*$//g') )
 
-  # convert capacity_cpu dependened by unit
+  # convert capacity_cpu depending on unit
   capacity_cpu=$(convertCpu ${capacity_cpu_count} ${capacity_cpu_unit})
 
   # split capacity_memory
   declare -a capacity_memory_unit=( $(echo "${capacity_memory}" | sed 's/^[0-9]*//g') )
   declare -a capacity_memory_count=( $(echo "${capacity_memory}" | sed 's/[a-zA-Z]*$//g') )
 
-  # convert capacity_memory dependened by unit
+  # convert capacity_memory depending on unit
   capacity_memory=$(convertMemory ${capacity_memory_count} ${capacity_memory_unit})
 
   # split capacity_pods
   declare -a capacity_pods_unit=( $(echo "${capacity_pods}" | sed 's/^[0-9]*//g') )
   declare -a capacity_pods_count=( $(echo "${capacity_pods}" | sed 's/[a-zA-Z]*$//g') )
 
-  # convert capacity_pods dependened by unit
+  # convert capacity_pods depending on unit
   capacity_pods=$(convertPods ${capacity_pods_count} ${capacity_pods_unit})
 
   # split requested_cpu
   requested_cpu_unit=( $(echo "${requested_cpu}" | sed 's/^[0-9]*//g') )
   requested_cpu_count=( $(echo "${requested_cpu}" | sed 's/[a-zA-Z]*$//g') )
 
-  # convert requested_cpu dependened by unit
+  # convert requested_cpu depending on unit
   requested_cpu=$(convertCpu ${requested_cpu_count} ${requested_cpu_unit})
 
   # split reqested_memory
   declare -a requested_memory_unit=( $(echo "${requested_memory}" | sed 's/^[0-9]*//g') )
   declare -a requested_memory_count=( $(echo "${requested_memory}" | sed 's/[a-zA-Z]*$//g') )
 
-  # convert requested_memory dependened by unit
+  # convert requested_memory depending on unit
   requested_memory=$(convertMemory ${requested_memory_count} ${requested_memory_unit})
 
   # split requested_pods
   declare -a requested_pods_unit=( $(echo "${requested_pods}" | sed 's/^[0-9]*//g') )
   declare -a requested_pods_count=( $(echo "${requested_pods}" | sed 's/[a-zA-Z]*$//g') )
 
-  # convert requested_pods dependened by unit
+  # convert requested_pods depending on unit
   requested_pods=$(convertPods ${requested_pods_count} ${requested_pods_unit})
 
   if [[ "${clusterstate}" != "active" ]]; then
@@ -576,7 +576,7 @@ if [[ -z $clustername ]]; then
     capacity_cpu_unit=( $(echo "${capacity_cpu}" | sed 's/^[0-9]*//g') )
     capacity_cpu_count=( $(echo "${capacity_cpu}" | sed 's/[a-zA-Z]*$//g') )
 
-    # convert capacity_cpu dependened by unit
+    # convert capacity_cpu depending on unit
     capacity_cpu=$(convertCpu ${capacity_cpu_count} ${capacity_cpu_unit})
 
     let nodes_capacity_cpu_total+=$capacity_cpu
@@ -588,7 +588,7 @@ if [[ -z $clustername ]]; then
     capacity_memory_unit=( $(echo "${capacity_memory}" | sed 's/^[0-9]*//g') )
     capacity_memory_count=( $(echo "${capacity_memory}" | sed 's/[a-zA-Z]*$//g') )
 
-    # convert capacity_memory dependened by unit
+    # convert capacity_memory depending on unit
     capacity_memory=$(convertMemory ${capacity_memory_count} ${capacity_memory_unit})
 
     let nodes_capacity_memory_total+=$capacity_memory
@@ -600,7 +600,7 @@ if [[ -z $clustername ]]; then
     capacity_pods_unit=( $(echo "${capacity_pods}" | sed 's/^[0-9]*//g') )
     capacity_pods_count=( $(echo "${capacity_pods}" | sed 's/[a-zA-Z]*$//g') )
 
-    # convert capacity_pods dependened by unit
+    # convert capacity_pods depending on unit
     capacity_pods=$(convertPods ${capacity_pods_count} ${capacity_pods_unit})
      
     let nodes_capacity_pods_total+=$capacity_pods
@@ -613,7 +613,7 @@ if [[ -z $clustername ]]; then
     requested_cpu_unit=( $(echo "${requested_cpu}" | sed 's/^[0-9]*//g') )
     requested_cpu_count=( $(echo "${requested_cpu}" | sed 's/[a-zA-Z]*$//g') )
 
-    # convert requested_cpu dependened by unit
+    # convert requested_cpu depending on unit
     requested_cpu=$(convertCpu ${requested_cpu_count} ${requested_cpu_unit})
 
     let nodes_requested_cpu_total+=$requested_cpu
@@ -625,7 +625,7 @@ if [[ -z $clustername ]]; then
     requested_memory_unit=( $(echo "${requested_memory}" | sed 's/^[0-9]*//g') )
     requested_memory_count=( $(echo "${requested_memory}" | sed 's/[a-zA-Z]*$//g') )
 
-    # convert requested_memory dependened by unit
+    # convert requested_memory depending on unit
     requested_memory=$(convertMemory ${requested_memory_count} ${requested_memory_unit})
 
     let nodes_requested_memory_total+=$requested_memory
@@ -637,7 +637,7 @@ if [[ -z $clustername ]]; then
     requested_pods_unit=( $(echo "${requested_pods}" | sed 's/^[0-9]*//g') )
     requested_pods_count=( $(echo "${requested_pods}" | sed 's/[a-zA-Z]*$//g') )
 
-    # convert requested_pods dependened by unit
+    # convert requested_pods depending on unit
     requested_pods=$(convertPods ${requested_pods_count} ${requested_pods_unit})
 
     let nodes_requested_pods_total+=$requested_pods
@@ -705,42 +705,42 @@ else
     node_capacity_cpu_unit=( $(echo "${node_capacity_cpu[$i]}" | sed 's/^[0-9]*//g') )
     node_capacity_cpu_count=( $(echo "${node_capacity_cpu[$i]}" | sed 's/[a-zA-Z]*$//g') )
 
-    # convert node_capacity_cpu dependened by unit
+    # convert node_capacity_cpu depding on unit
     capacity_cpu=$(convertCpu ${node_capacity_cpu_count} ${node_capacity_cpu_unit})
 
     # split node_capacity_memory
     node_capacity_memory_unit=( $(echo "${node_capacity_memory[$i]}" | sed 's/^[0-9]*//g') )
     node_capacity_memory_count=( $(echo "${node_capacity_memory[$i]}" | sed 's/[a-zA-Z]*$//g') )
 
-    # convert node_capacity_memory dependened by unit
+    # convert node_capacity_memory depnding on unit
     capacity_memory=$(convertMemory ${node_capacity_memory_count} ${node_capacity_memory_unit})
 
     # split node_capacity_pods
     node_capacity_pods_unit=( $(echo "${node_capacity_pods[$i]}" | sed 's/^[0-9]*//g') )
     node_capacity_pods_count=( $(echo "${node_capacity_pods[$i]}" | sed 's/[a-zA-Z]*$//g') )
 
-    # convert node_capacity_pods dependened by unit
+    # convert node_capacity_pods depending on unit
     capacity_pods=$(convertPods ${node_capacity_pods_count} ${node_capacity_pods_unit})
 
     # split node_requested_cpu
     node_requested_cpu_unit=( $(echo "${node_requested_cpu[$i]}" | sed 's/^[0-9]*//g') )
     node_requested_cpu_count=( $(echo "${node_requested_cpu[$i]}" | sed 's/[a-zA-Z]*$//g') )
 
-    # convert node_requested_cpu dependened by unit 
+    # convert node_requested_cpu depending on unit 
     requested_cpu=$(convertCpu ${node_requested_cpu_count} ${node_requested_cpu_unit})
 
     # split node_requested_memory
     node_requested_memory_unit=( $(echo "${node_requested_memory[$i]}" | sed 's/^[0-9]*//g') )
     node_requested_memory_count=( $(echo "${node_requested_memory[$i]}" | sed 's/[a-zA-Z]*$//g') )
 
-    # convert node_requested_memory dependened by unit
+    # convert node_requested_memory depending on unit
     requested_memory=$(convertMemory ${node_requested_memory_count} ${node_requested_memory_unit})
 
     # split node_requested_pods
     node_requested_pods_unit=( $(echo "${node_requested_pods[$i]}" | sed 's/^[0-9]*//g') )
     node_requested_pods_count=( $(echo "${node_requested_pods[$i]}" | sed 's/[a-zA-Z]*$//g') )
 
-    # convert node_requested_pods dependened by unit
+    # convert node_requested_pods depending on unit
     requested_pods=$(convertPods ${node_requested_pods_count} ${node_requested_pods_unit})
 
     # usage
@@ -817,7 +817,7 @@ else
     capacity_cpu_unit=( $(echo "${capacity_cpu}" | sed 's/^[0-9]*//g') )
     capacity_cpu_count=( $(echo "${capacity_cpu}" | sed 's/[a-zA-Z]*$//g') )
     
-    # convert capacity_cpu dependened by unit
+    # convert capacity_cpu depending on unit
     capacity_cpu=$(convertCpu ${capacity_cpu_count} ${capacity_cpu_unit})
     
     let nodes_capacity_cpu_total+=$capacity_cpu
@@ -829,7 +829,7 @@ else
     capacity_memory_unit=( $(echo "${capacity_memory}" | sed 's/^[0-9]*//g') )
     capacity_memory_count=( $(echo "${capacity_memory}" | sed 's/[a-zA-Z]*$//g') )
     
-    # convert capacity_memory dependened by unit
+    # convert capacity_memory depending on unit
     capacity_memory=$(convertMemory ${capacity_memory_count} ${capacity_memory_unit})
     
     let nodes_capacity_memory_total+=$capacity_memory
@@ -841,7 +841,7 @@ else
     capacity_pods_unit=( $(echo "${capacity_pods}" | sed 's/^[0-9]*//g') )
     capacity_pods_count=( $(echo "${capacity_pods}" | sed 's/[a-zA-Z]*$//g') )
     
-    # convert capacity_pods dependened by unit
+    # convert capacity_pods depending on unit
     capacity_pods=$(convertPods ${capacity_pods_count} ${capacity_pods_unit})
     
     let nodes_capacity_pods_total+=$capacity_pods
@@ -854,7 +854,7 @@ else
     requested_cpu_unit=( $(echo "${requested_cpu}" | sed 's/^[0-9]*//g') )
     requested_cpu_count=( $(echo "${requested_cpu}" | sed 's/[a-zA-Z]*$//g') )
     
-    # convert requested_cpu dependened by unit
+    # convert requested_cpu depending on unit
     requested_cpu=$(convertCpu ${requested_cpu_count} ${requested_cpu_unit})
     
     let nodes_requested_cpu_total+=$requested_cpu
@@ -866,7 +866,7 @@ else
     requested_memory_unit=( $(echo "${requested_memory}" | sed 's/^[0-9]*//g') )
     requested_memory_count=( $(echo "${requested_memory}" | sed 's/[a-zA-Z]*$//g') )
     
-    # convert requested_memory dependened by unit
+    # convert requested_memory depending on unit
     requested_memory=$(convertMemory ${requested_memory_count} ${requested_memory_unit})
 
     let nodes_requested_memory_total+=$requested_memory
@@ -878,7 +878,7 @@ else
     requested_pods_unit=( $(echo "${requested_pods}" | sed 's/^[0-9]*//g') )
     requested_pods_count=( $(echo "${requested_pods}" | sed 's/[a-zA-Z]*$//g') )
 
-    # convert requested_pods dependened by unit
+    # convert requested_pods depending on unit
     requested_pods=$(convertPods ${requested_pods_count} ${requested_pods_unit})
 
     let nodes_requested_pods_total+=$requested_pods
