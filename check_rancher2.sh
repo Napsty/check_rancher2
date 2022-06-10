@@ -18,9 +18,9 @@
 # You should have received a copy of the GNU General Public License along with this      #
 # program; if not, see <https://www.gnu.org/licenses/>.                                  #
 #                                                                                        #
-# Copyright 2018-2021 Claudio Kuenzler                                                   #
+# Copyright 2018-2022 Claudio Kuenzler                                                   #
 # Copyright 2020 Matthias Kneer                                                          #
-# Copyright 2021 Steffen Eichler                                                         #
+# Copyright 2021,2022 Steffen Eichler                                                         #
 # Copyright 2021 lopf                                                                    #
 #                                                                                        #
 # History:                                                                               #
@@ -47,6 +47,7 @@
 # 20210824 1.6.1 Fix cluster and project not found error (#24)                           #
 # 20211021 1.7.0 Check for additional node (pressure) conditions (#27)                   #
 # 20211201 1.7.1 Fix cluster state detection (#26)                                       #
+# 20220610 1.8.0 More performance data, long parameters, other improvements (#31)        #
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
@@ -55,12 +56,12 @@ STATE_CRITICAL=2        # define the exit code if status is Critical
 STATE_UNKNOWN=3         # define the exit code if status is Unknown
 export PATH=/usr/local/bin:/usr/bin:/bin:$PATH # Set path
 proto=http		# Protocol to use, default is http, can be overwritten with -S parameter
-version=1.7.1
+version=1.8.0
 
 # functions
 
 # https://kubernetes.io/docs/reference/kubernetes-api/common-definitions/quantity/
-# convert memory to smallest possible value byte dependened by unit
+# convert memory to smallest possible value byte depending by unit
 function convertMemory()
 {
   local memory_count=$1
@@ -102,7 +103,7 @@ function convertMemory()
   printf $memory
 }
 
-# convert cpu to smallest possible value (m = milli CPU) dependened by unit
+# convert cpu to smallest possible value (m = milli CPU) depended by unit
 function convertCpu()
 {
   local cpu_count=$1
@@ -145,7 +146,7 @@ function convertPods()
 # We all need help from time to time
 usage ()
 {
-printf "check_rancher2 v ${version} (c) 2018-2021 Claudio Kuenzler and contributers (published under GPLv2)
+printf "check_rancher2 v ${version} (c) 2018-2022 Claudio Kuenzler and contributers (published under GPLv2)
 Usage: $0 -H Rancher2Address -U user-token -P password [-S] -t checktype [-c cluster] [-p project] [-w workload]
 
 Options:
