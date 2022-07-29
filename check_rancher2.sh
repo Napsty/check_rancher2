@@ -479,7 +479,7 @@ else
     fi
   fi
 
-  perf_output="'component_errors'=${#componenterrors[*]};;;; 'cpu'=${requested_cpu};;;;${capacity_cpu} 'memory'=${requested_memory}B;;;0;${capacity_memory} 'pods'=${requested_pods};;;;${capacity_pods} 'usage_cpu'=${usage_cpu}%%;${cpu_warn};${cpu_crit};0;100 'usage_memory'=${usage_memory}%%;${memory_warn};${memory_crit};0;100 'usage_pods'=${usage_pods}%%;${pods_warn};${pods_crit};0;100"
+  perf_output="'component_errors'=${#componenterrors[*]};;;; 'cpu'=${requested_cpu};;;;${capacity_cpu} 'memory'=${requested_memory}B;;;0;${capacity_memory} 'pods'=${requested_pods};;;;${capacity_pods} 'usage_cpu'=${usage_cpu}%;${cpu_warn};${cpu_crit};0;100 'usage_memory'=${usage_memory}%;${memory_warn};${memory_crit};0;100 'usage_pods'=${usage_pods}%;${pods_warn};${pods_crit};0;100"
 
   if [[ ${#componenterrors[*]} -gt 0 && ! -z ${resourceerrors} ]]; then
     echo "CHECK_RANCHER2 CRITICAL - Cluster $clusteralias has resource problems and component errors: ${resourceerrors} ${componenterrors[*]}|'cluster_healthy'=0;;;; ${perf_output}"
