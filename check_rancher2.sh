@@ -1190,7 +1190,7 @@ if test -f "$cronconverter"; then
     lastruntime=$(echo "$api_out_single_cronjob" | jq -r '.cronJobStatus.lastScheduleTimeTS')
     currentdiff=$((currenttime-lastruntime))
 
-    if [[ ${suspended} = true]]; then
+    if [[ ${suspended} = true ]]; then
       echo "CHECK_RANCHER2 WARNING - Cronjob $workloadname ${nsoutputappend}is suspended.|'workload_active'=0;;;; 'workload_error'=0;;;; 'workload_warning'=1;;;;"
       exit ${STATE_WARNING}
     
