@@ -1160,7 +1160,7 @@ if [[ -n $namespacename && $namespacename != "" ]]; then
   nsoutputappend="in namespace $namespacename "
 fi
 
-api_out_single_cronjob=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${clustername}:${projectname}/workloads/cronjob:${namespacename}:${workloadname}")
+api_out_single_cronjob=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${projectname}/workloads/cronjob:${namespacename}:${workloadname}")
 
 # Check if cluster is available
 if [[ -n $(echo "$api_out_single_cronjob" | grep -i "ClusterUnavailable") ]]; then
