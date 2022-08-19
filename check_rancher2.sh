@@ -178,6 +178,7 @@ Check Types:
 \tproject -> Checks the current status of all projects or of a specific project (defined with -p projectid)
 \tworkload -> Checks the current status of all or a specific (-w workloadname) workload within a project (-p projectid must be set!)
 \tpod -> Checks the current status of all or a specific (-o podname -n namespace) pod within a project (-p projectid must be set!)
+\tcron -> Checks the current status of a single (-w workloadname) cronjob within a project (-p projectid and -w workloadname must be set!)
 "
 exit ${STATE_UNKNOWN}
 }
@@ -1145,6 +1146,77 @@ else
 
 fi
 ;;
+
+# --- cronjob status check (requires project, namespace and workload name)--- #
+
+cron)
+if [ -z $projectname ] || [ -z $workloadname ] || [ -z $namespacename ]; then
+  echo -e "CHECK_RANCHER2 UNKNOWN - To check a cronjob you must define the project (-p), workloadname (-w) and the namespace (-n)."
+  exit ${STATE_UNKNOWN}
+fi
+
+if [[ -n $namespacename && $namespacename != "" ]]; then
+  nsappend="&namespaceId=$namespacename"
+  nsoutputappend="in namespace $namespacename "
+fi
+
+api_out_single_cronjob=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/project/${clustername}:${projectname}/workloads/cronjob:${namespacename}:${workloadname}")
+
+# Check if cluster is available
+if [[ -n $(echo "$api_out_single_cronjob" | grep -i "ClusterUnavailable") ]]; then
+  clustername=$(echo ${projectname} | awk -F':' '{print $1}')
+  echo "CHECK_RANCHER2 CRITICAL - Cluster $clustername not found. Hint: Use '-t info' to identify cluster and project names."; exit ${STATE_CRITICAL}
+fi
+
+# Check if that given project name exists
+if [[ -z $(echo "$api_out_single_cronjob" | grep -i "containers") ]]; then
+  echo "CHECK_RANCHER2 CRITICAL - Cronjob $workloadname ${nsoutputappend}not found."; exit ${STATE_CRITICAL}
+fi
+
+# Path to cron schedule converter
+cronconverter=./convert_cron_schedule.py
+
+# Check healthstatus of cronjob
+healthstatus=$(echo "$api_out_single_cronjob" | jq -r '.state')
+suspended=$(echo "$api_out_single_cronjob" | jq -r '.cronJobConfig.suspend')
+
+# Check if cronjob is active and runs in defined schedule
+if test -f "$cronconverter"; then
+
+  if [[ ${healthstatus} = active ]]; then
+    cronschedule=$(echo "$api_out_single_cronjob" | jq -r '.cronJobConfig.schedule')
+    crondiff=$(python3 convert_cron_schedule.py "$cronschedule" difftimestamp)
+    currenttime=$(date +%s%N | cut -b1-13)
+    lastruntime=$(echo "$api_out_single_cronjob" | jq -r '.cronJobStatus.lastScheduleTimeTS')
+    currentdiff=$((currenttime-lastruntime))
+
+    if [[ ${suspended} = true]]; then
+      echo "CHECK_RANCHER2 WARNING - Cronjob $workloadname ${nsoutputappend}is suspended.|'workload_active'=0;;;; 'workload_error'=0;;;; 'workload_warning'=1;;;;"
+      exit ${STATE_WARNING}
+    
+    elif [[ $currentdiff -gt $crondiff ]]; then
+      echo "CHECK_RANCHER2 CRITICAL - Cronjob $workloadname ${nsoutputappend}is not running in schedule time."
+      exit ${STATE_CRITICAL}
+    else
+      echo "CHECK_RANCHER2 OK - Cronjob $workloadname ${nsoutputappend}is running properly."
+      exit ${STATE_OK}
+    fi
+
+  elif [[ ${healthstatus} = updating ]]; then
+    echo "CHECK_RANCHER2 WARNING - Cronjob $workloadname ${nsoutputappend}is ${healthstatus}|'workload_active'=0;;;; 'workload_error'=0;;;; 'workload_warning'=1;;;;"
+    exit ${STATE_WARNING}
+
+  else
+    echo "CHECK_RANCHER2 CRITICAL - Cronjob $workloadname ${nsoutputappend}is ${healthstatus}|'workload_active'=0;;;; 'workload_error'=1;;;; 'workload_warning'=0;;;;"
+    exit ${STATE_CRITICAL}
+  fi
+
+else 
+  echo "CHECK_RANCHER2 UNKNOWN - Resource not found: convert_cron_schedule.py"
+  exit ${STATE_UNKNOWN}
+fi
+;;
+
 
 esac
 echo "UNKNOWN: should never reach this part"
