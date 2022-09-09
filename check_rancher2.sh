@@ -49,6 +49,8 @@
 # 20211201 1.7.1 Fix cluster state detection (#26)                                       #
 # 20220610 1.8.0 More performance data, long parameters, other improvements (#31)        #
 # 20220729 1.9.0 Output improvements (#32), show workload namespace (#33)                #
+# 20220909 1.10.0 Fix ComponentStatus (#35), show K8s version in single cluster check    #
+# 20220909 1.10.0 Allow ignoring statuses on workload checks (#29)                       #
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
@@ -57,7 +59,7 @@ STATE_CRITICAL=2        # define the exit code if status is Critical
 STATE_UNKNOWN=3         # define the exit code if status is Unknown
 export PATH=/usr/local/bin:/usr/bin:/bin:$PATH # Set path
 proto=http		# Protocol to use, default is http, can be overwritten with -S parameter
-version=1.9.0
+version=1.10.0
 ##########################################################################################
 # functions
 
@@ -338,8 +340,8 @@ if [[ -z $clustername ]]; then
     #echo $cluster # For Debug
     clusteralias=$(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'")|.name')
     declare -a clusterstate=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'") | .state') )
-    declare -a component=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'") | .componentStatuses[].name') )
-    declare -a healthstatus=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'") | .componentStatuses[].conditions[].status') )
+    declare -a component=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'") | .componentStatuses[]?.name') )
+    declare -a healthstatus=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'") | .componentStatuses[]?.conditions[].status') )
 
     if [[ "${clusterstate}" != "active" ]]; then
         componenterrors[$e]="cluster ${clusteralias} is in ${clusterstate} state -"
@@ -381,8 +383,9 @@ else
 
   clusteralias=$(echo "$api_out_single_cluster" | jq -r '.name')
   clusterstate=$(echo "$api_out_single_cluster" | jq -r '.state')
-  declare -a component=( $(echo "$api_out_single_cluster" | jq -r '.componentStatuses[].name') )
-  declare -a healthstatus=( $(echo "$api_out_single_cluster" | jq -r '.componentStatuses[].conditions[].status') )
+  k8sversion=$(echo "$api_out_single_cluster" | jq -r '.version.gitVersion')
+  declare -a component=( $(echo "$api_out_single_cluster" | jq -r '.componentStatuses[]?.name') )
+  declare -a healthstatus=( $(echo "$api_out_single_cluster" | jq -r '.componentStatuses[]?.conditions[].status') )
 
   # capacity
   declare -a capacity_cpu=( $(echo "$api_out_single_cluster" | jq -r '.capacity.cpu') )
@@ -491,7 +494,7 @@ else
     echo "CHECK_RANCHER2 CRITICAL - Cluster $clusteralias has resource problems: ${resourceerrors}|'cluster_healthy'=0;;;; ${perf_output}"
     exit ${STATE_CRITICAL}
   else
-    echo "CHECK_RANCHER2 OK - Cluster $clusteralias is healthy|'cluster_healthy'=1;;;; ${perf_output}"
+    echo "CHECK_RANCHER2 OK - Cluster $clusteralias ($k8sversion) is healthy|'cluster_healthy'=1;;;; ${perf_output}"
     exit ${STATE_OK}
   fi
 
@@ -992,9 +995,17 @@ if [[ -z $workloadname ]]; then
   for workload in ${workload_names[*]}; do
     for status in ${healthstatus[$i]}; do
       if [[ ${status} = updating ]]; then
-        workloadwarnings[$i]="Workload ${workload} is ${status} -"
+        if [[ -n $(echo ${ignore} | grep -i ${status}) ]]; then
+          workloadignored[$i]="Workload ${workload} is ${status} but ignored -"
+        else
+          workloadwarnings[$i]="Workload ${workload} is ${status} -"
+        fi
       elif [[ ${status} != active ]]; then
-        workloaderrors[$i]="Workload ${workload} is ${status} -"
+        if [[ -n $(echo ${ignore} | grep -i ${status}) ]]; then
+          workloadignored[$i]="Workload ${workload} is ${status} but ignored -"
+        else
+          workloaderrors[$i]="Workload ${workload} is ${status} -"
+        fi
       fi
     done
     for paused in ${pausedstatus[$i]}; do
@@ -1005,17 +1016,21 @@ if [[ -z $workloadname ]]; then
     let i++
   done
 
+  if [[ ${#workloadignored[*]} -gt 0 ]]; then
+    ignoreoutput="- ${workloadignored[*]}"
+  fi
+
   if [[ ${#workloaderrors[*]} -gt 0 ]]; then
-    echo  "CHECK_RANCHER2 CRITICAL - ${#workloaderrors[*]} workload(s) in error state: ${workloaderrors[*]}|'workloads_total'=${#workload_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;; 'workloads_warnings'=${#workloadwarnings[*]};;;; 'workloads_paused'=${#workloadpaused[*]};;;;"
+    echo  "CHECK_RANCHER2 CRITICAL - ${#workloaderrors[*]} workload(s) in error state: ${workloaderrors[*]} ${ignoreoutput}|'workloads_total'=${#workload_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;; 'workloads_warnings'=${#workloadwarnings[*]};;;; 'workloads_paused'=${#workloadpaused[*]};;;; 'workloads_ignored'=${#workloadignored[*]};;;;"
     exit ${STATE_CRITICAL}
   elif [[ ${#workloadwarnings[*]} -gt 0 ]]; then
-    echo "CHECK_RANCHER2 WARNING - ${#workloadwarnings[*]} workload(s) in warning state: ${workloadwarnings[*]}|'workloads_total'=${#workload_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;; 'workloads_warnings'=${#workloadwarnings[*]};;;; 'workloads_paused'=${#workloadpaused[*]};;;;"
+    echo "CHECK_RANCHER2 WARNING - ${#workloadwarnings[*]} workload(s) in warning state: ${workloadwarnings[*]} ${ignoreoutput}|'workloads_total'=${#workload_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;; 'workloads_warnings'=${#workloadwarnings[*]};;;; 'workloads_paused'=${#workloadpaused[*]};;;; 'workloads_ignored'=${#workloadignored[*]};;;;"
     exit ${STATE_WARNING}
   else
     if [[ ${#workloadpaused[*]} -gt 0 ]]; then
-      echo "CHECK_RANCHER2 OK - All workloads (${#workload_names[*]}) in project ${projectname} are healthy/active ( Note: ${#workloadpaused[*]} workloads currently paused: ${workloadpaused[*]})|'workloads_total'=${#workload_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;; 'workloads_warnings'=${#workloadwarnings[*]};;;; 'workloads_paused'=${#workloadpaused[*]};;;;"
+      echo "CHECK_RANCHER2 OK - All workloads (${#workload_names[*]}) in project ${projectname} are healthy/active ( Note: ${#workloadpaused[*]} workloads currently paused: ${workloadpaused[*]}) ${ignoreoutput}|'workloads_total'=${#workload_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;; 'workloads_warnings'=${#workloadwarnings[*]};;;; 'workloads_paused'=${#workloadpaused[*]};;;; 'workloads_ignored'=${#workloadignored[*]};;;;"
     else
-      echo "CHECK_RANCHER2 OK - All workloads (${#workload_names[*]}) in project ${projectname} are healthy/active|'workloads_total'=${#workload_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;; 'workloads_warnings'=${#workloadwarnings[*]};;;; 'workloads_paused'=${#workloadpaused[*]};;;;"
+      echo "CHECK_RANCHER2 OK - All workloads (${#workload_names[*]}) in project ${projectname} are healthy/active ${ignoreoutput}|'workloads_total'=${#workload_names[*]};;;; 'workloads_errors'=${#workloaderrors[*]};;;; 'workloads_warnings'=${#workloadwarnings[*]};;;; 'workloads_paused'=${#workloadpaused[*]};;;; 'workloads_ignored'=${#workloadignored[*]};;;;"
     fi
     exit ${STATE_OK}
   fi
@@ -1050,13 +1065,23 @@ else
   healthstatus=$(echo "$api_out_single_workload" | jq -r '.data[].state')
   
   if [[ ${healthstatus} = updating ]]; then
-    echo "CHECK_RANCHER2 WARNING - Workload $workloadname ${nsoutputappend}is ${healthstatus}|'workload_active'=0;;;; 'workload_error'=0;;;; 'workload_warning'=1;;;;"
-    exit ${STATE_WARNING}
+    if [[ -n $(echo ${ignore} | grep -i ${healthstatus}) ]]; then
+      echo "CHECK_RANCHER2 OK - Workload $workloadname ${nsoutputappend}is ${healthstatus} but ignored|'workload_active'=0;;;; 'workload_error'=0;;;; 'workload_warning'=1;;;; 'workload_ignored'=1;;;;"
+      exit ${STATE_WARNING}
+    else
+      echo "CHECK_RANCHER2 WARNING - Workload $workloadname ${nsoutputappend}is ${healthstatus}|'workload_active'=0;;;; 'workload_error'=0;;;; 'workload_warning'=1;;;; 'workload_ignored'=0;;;;"
+      exit ${STATE_WARNING}
+    fi
   elif [[ ${healthstatus} != active ]]; then
-    echo "CHECK_RANCHER2 CRITICAL - Workload $workloadname ${nsoutputappend}is ${healthstatus}|'workload_active'=0;;;; 'workload_error'=1;;;; 'workload_warning'=0;;;;"
-    exit ${STATE_CRITICAL}
+    if [[ -n $(echo ${ignore} | grep -i ${healthstatus}) ]]; then
+      echo "CHECK_RANCHER2 CRITICAL - Workload $workloadname ${nsoutputappend}is ${healthstatus} but ignored|'workload_active'=0;;;; 'workload_error'=1;;;; 'workload_warning'=0;;;; 'workload_ignored'=1;;;;"
+      exit ${STATE_CRITICAL}
+    else
+      echo "CHECK_RANCHER2 CRITICAL - Workload $workloadname ${nsoutputappend}is ${healthstatus}|'workload_active'=0;;;; 'workload_error'=1;;;; 'workload_warning'=0;;;; 'workload_ignored'=0;;;;"
+      exit ${STATE_CRITICAL}
+    fi
   else
-    echo "CHECK_RANCHER2 OK - Workload $workloadname ${nsoutputappend}is active|'workload_active'=1;;;; 'workload_error'=0;;;; 'workload_warning'=0;;;;"
+    echo "CHECK_RANCHER2 OK - Workload $workloadname ${nsoutputappend}is active|'workload_active'=1;;;; 'workload_error'=0;;;; 'workload_warning'=0;;;; 'workload_ignored'=0;;;;"
     exit ${STATE_OK}
   fi
   
