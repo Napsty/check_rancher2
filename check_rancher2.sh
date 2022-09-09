@@ -340,8 +340,8 @@ if [[ -z $clustername ]]; then
     #echo $cluster # For Debug
     clusteralias=$(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'")|.name')
     declare -a clusterstate=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'") | .state') )
-    declare -a component=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'") | .componentStatuses[].name') )
-    declare -a healthstatus=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'") | .componentStatuses[].conditions[].status') )
+    declare -a component=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'") | .componentStatuses[]?.name') )
+    declare -a healthstatus=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'") | .componentStatuses[]?.conditions[].status') )
 
     if [[ "${clusterstate}" != "active" ]]; then
         componenterrors[$e]="cluster ${clusteralias} is in ${clusterstate} state -"
