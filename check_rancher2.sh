@@ -49,6 +49,7 @@
 # 20211201 1.7.1 Fix cluster state detection (#26)                                       #
 # 20220610 1.8.0 More performance data, long parameters, other improvements (#31)        #
 # 20220729 1.9.0 Output improvements (#32), show workload namespace (#33)                #
+# 20220909 1.9.1 Fix ComponentStatus (#35), show K8s version in single cluster check     #
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
@@ -57,7 +58,7 @@ STATE_CRITICAL=2        # define the exit code if status is Critical
 STATE_UNKNOWN=3         # define the exit code if status is Unknown
 export PATH=/usr/local/bin:/usr/bin:/bin:$PATH # Set path
 proto=http		# Protocol to use, default is http, can be overwritten with -S parameter
-version=1.9.0
+version=1.9.1
 ##########################################################################################
 # functions
 
@@ -381,8 +382,9 @@ else
 
   clusteralias=$(echo "$api_out_single_cluster" | jq -r '.name')
   clusterstate=$(echo "$api_out_single_cluster" | jq -r '.state')
-  declare -a component=( $(echo "$api_out_single_cluster" | jq -r '.componentStatuses[].name') )
-  declare -a healthstatus=( $(echo "$api_out_single_cluster" | jq -r '.componentStatuses[].conditions[].status') )
+  k8sversion=$(echo "$api_out_single_cluster" | jq -r '.version.gitVersion')
+  declare -a component=( $(echo "$api_out_single_cluster" | jq -r '.componentStatuses[]?.name') )
+  declare -a healthstatus=( $(echo "$api_out_single_cluster" | jq -r '.componentStatuses[]?.conditions[].status') )
 
   # capacity
   declare -a capacity_cpu=( $(echo "$api_out_single_cluster" | jq -r '.capacity.cpu') )
@@ -491,7 +493,7 @@ else
     echo "CHECK_RANCHER2 CRITICAL - Cluster $clusteralias has resource problems: ${resourceerrors}|'cluster_healthy'=0;;;; ${perf_output}"
     exit ${STATE_CRITICAL}
   else
-    echo "CHECK_RANCHER2 OK - Cluster $clusteralias is healthy|'cluster_healthy'=1;;;; ${perf_output}"
+    echo "CHECK_RANCHER2 OK - Cluster $clusteralias ($k8sversion) is healthy|'cluster_healthy'=1;;;; ${perf_output}"
     exit ${STATE_OK}
   fi
 
