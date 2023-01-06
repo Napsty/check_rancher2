@@ -18,7 +18,7 @@
 # You should have received a copy of the GNU General Public License along with this      #
 # program; if not, see <https://www.gnu.org/licenses/>.                                  #
 #                                                                                        #
-# Copyright 2018-2022 Claudio Kuenzler                                                   #
+# Copyright 2018-2023 Claudio Kuenzler                                                   #
 # Copyright 2020 Matthias Kneer                                                          #
 # Copyright 2021,2022 Steffen Eichler                                                    #
 # Copyright 2021 lopf                                                                    #
@@ -51,6 +51,7 @@
 # 20220729 1.9.0 Output improvements (#32), show workload namespace (#33)                #
 # 20220909 1.10.0 Fix ComponentStatus (#35), show K8s version in single cluster check    #
 # 20220909 1.10.0 Allow ignoring statuses on workload checks (#29)                       #
+# 20230106 1.11.0 Allow ignoring workload names, TBD...
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
@@ -59,7 +60,7 @@ STATE_CRITICAL=2        # define the exit code if status is Critical
 STATE_UNKNOWN=3         # define the exit code if status is Unknown
 export PATH=/usr/local/bin:/usr/bin:/bin:$PATH # Set path
 proto=http		# Protocol to use, default is http, can be overwritten with -S parameter
-version=1.10.0
+version=1.11.0
 ##########################################################################################
 # functions
 
@@ -164,7 +165,7 @@ Options:
 \t[ -n | --namespacename ] Namespace name (needed for specific workload or pod checks)
 \t[ -w | --workloadname ] Workload name (for specific workload check)
 \t[ -o | --podname ] Pod name (for specific pod check, this makes only sense if you use static pods)
-\t[ -i | --ignore ] Comma-separated list of status(es) to ignore (currently only supported in node check type)
+\t[ -i | --ignore ] Comma-separated list of status(es) to ignore (on node and workload check type) or list of workload name(s) to ignore (on workload check type)
 \t[ --cpu-warn ] Exit with WARNING status if more than PERCENT of cpu capacity is used (currently only supported in cluster specific node and cluster check type)
 \t[ --cpu-crit ] Exit with CRITICAL status if more than PERCENT of cpu capacity is used (currently only supported in cluster specific node and cluster check type)
 \t[ --memory-warn ] Exit with WARNING status if more than PERCENT of mem capacity is used (currently only supported in cluster specific node and cluster check type)
@@ -994,6 +995,10 @@ if [[ -z $workloadname ]]; then
   i=0
   for workload in ${workload_names[*]}; do
     for status in ${healthstatus[$i]}; do
+      if [[ "${ignore}" =~ "${workload}" ]]; then
+        workloadignored[$i]="Workload ${workload} is ignored -"
+        continue
+      fi
       if [[ ${status} = updating ]]; then
         if [[ -n $(echo ${ignore} | grep -i ${status}) ]]; then
           workloadignored[$i]="Workload ${workload} is ${status} but ignored -"
