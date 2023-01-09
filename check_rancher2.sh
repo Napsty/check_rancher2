@@ -343,7 +343,10 @@ if [[ -z $clustername ]]; then
     declare -a component=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'") | .componentStatuses[]?.name') )
     declare -a healthstatus=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'") | .componentStatuses[]?.conditions[].status') )
 
-    if [[ "${clusterstate}" != "active" ]]; then
+    if [[ "${clusterstate}" = "provisioning" ]]; then
+        componentwarnings[$e]="cluster ${clusteralias} is in ${clusterstate} state -"
+        clusterwarnings[$e]="${cluster}"
+    elif [[ "${clusterstate}" != "active" ]]; then
         componenterrors[$e]="cluster ${clusteralias} is in ${clusterstate} state -"
         clustererrors[$e]="${cluster}"
     fi
@@ -361,12 +364,16 @@ if [[ -z $clustername ]]; then
   done
 
   clustererrorcount=$(echo ${clustererrors[*]} | tr ' ' '\n' | sort -u | tr '\n' ' ' | wc -w)
+  clusterwarningcount=$(echo ${clusterwarnings[*]} | tr ' ' '\n' | sort -u | tr '\n' ' ' | wc -w)
 
   if [[ ${#componenterrors[*]} -gt 0 ]]; then
-    echo "CHECK_RANCHER2 CRITICAL - ${componenterrors[*]}|'clusters_total'=${#cluster_ids[*]};;;; 'clusters_errors'=${clustererrorcount};;;;"
+    echo "CHECK_RANCHER2 CRITICAL - ${componenterrors[*]}|'clusters_total'=${#cluster_ids[*]};;;; 'clusters_errors'=${clustererrorcount};;;; 'clusters_warning'=${clusterwarningcount};;;;"
     exit ${STATE_CRITICAL}
+  elif [[ ${#componentwarnings[*]} -gt 0 ]]; then
+    echo "CHECK_RANCHER2 WARNING - ${componentwarnings[*]}|'clusters_total'=${#cluster_ids[*]};;;; 'clusters_errors'=${clustererrorcount};;;; 'clusters_warning'=${clusterwarningcount};;;;"
+    exit ${STATE_WARNING}
   else
-    echo "CHECK_RANCHER2 OK - All clusters (${#cluster_ids[*]}) are healthy|'clusters_total'=${#cluster_ids[*]};;;; 'clusters_errors'=${#componenterrors[*]};;;;"
+    echo "CHECK_RANCHER2 OK - All clusters (${#cluster_ids[*]}) are healthy|'clusters_total'=${#cluster_ids[*]};;;; 'clusters_errors'=${#componenterrors[*]};;;; 'clusters_warning'=${clusterwarningcount};;;;"
     exit ${STATE_OK}
   fi
 
