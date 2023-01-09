@@ -343,7 +343,7 @@ if [[ -z $clustername ]]; then
     declare -a component=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'") | .componentStatuses[]?.name') )
     declare -a healthstatus=( $(echo "$api_out_clusters" | jq -r '.data[] | select(.id == "'${cluster}'") | .componentStatuses[]?.conditions[].status') )
 
-    if [[ "${clusterstate}" != "active" && "${clusterstate}" != "provisioning" ]]; then
+    if [[ "${clusterstate}" != "active" ]]; then
         componenterrors[$e]="cluster ${clusteralias} is in ${clusterstate} state -"
         clustererrors[$e]="${cluster}"
     fi
