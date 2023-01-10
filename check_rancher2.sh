@@ -20,7 +20,7 @@
 #                                                                                        #
 # Copyright 2018-2023 Claudio Kuenzler                                                   #
 # Copyright 2020 Matthias Kneer                                                          #
-# Copyright 2021,2022 Steffen Eichler                                                    #
+# Copyright 2021-2023 Steffen Eichler                                                    #
 # Copyright 2021 lopf                                                                    #
 #                                                                                        #
 # History:                                                                               #
@@ -51,7 +51,7 @@
 # 20220729 1.9.0 Output improvements (#32), show workload namespace (#33)                #
 # 20220909 1.10.0 Fix ComponentStatus (#35), show K8s version in single cluster check    #
 # 20220909 1.10.0 Allow ignoring statuses on workload checks (#29)                       #
-# 20230106 1.11.0 Allow ignoring workload names, TBD...
+# 20230110 1.11.0 Allow ignoring workload names, provisioning cluster not critical (#39) #
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
