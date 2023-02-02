@@ -166,7 +166,7 @@ Options:
 \t[ -n | --namespacename ] Namespace name (needed for specific workload or pod checks)
 \t[ -w | --workloadname ] Workload name (for specific workload check)
 \t[ -o | --podname ] Pod name (for specific pod check, this makes only sense if you use static pods)
-\t[ -i | --ignore ] Comma-separated list of status(es) to ignore (on node and workload check type) or list of workload name(s) to ignore (on workload check type)
+\t[ -i | --ignore ] Comma-separated list of status(es) to ignore (node and workload check types), list of workload name(s) to ignore (workload check type) or certificate to ignore (local-certs check type)
 \t[ --cpu-warn ] Exit with WARNING status if more than PERCENT of cpu capacity is used (supported check types: node, cluster)
 \t[ --cpu-crit ] Exit with CRITICAL status if more than PERCENT of cpu capacity is used (supported check types: node, cluster)
 \t[ --memory-warn ] Exit with WARNING status if more than PERCENT of mem capacity is used (supported check types: node, cluster)
@@ -1202,6 +1202,10 @@ declare -a cert_expiry=( $(echo "$api_out_certs" | jq -r '.data[] | select(.type
 
 i=0
 for entry in ${cert_expiry[*]}; do
+  if [[ -n $(echo ${ignore} | grep -x ${cert_names[${i}]}) ]]; then
+    cert_ignored[${i}]="${cert_names[${i}]}"
+    continue
+  fi
   expiry=$(date --date="${entry}" +%s)
   if [[ ${rightnow} -gt ${expiry} ]]; then
     let diff=(${rightnow}-${expiry})/86400
@@ -1214,14 +1218,18 @@ for entry in ${cert_expiry[*]}; do
   let i++
 done
 
+if [[ ${#cert_ignored[*]} -gt 0 ]]; then
+  ignoreoutput="- ${#cert_ignored[*]} certificate(s) ignored: ${cert_ignored[*]}"
+fi
+
 if [[ ${#cert_expired[*]} -gt 0 ]]; then
-  echo "CHECK_RANCHER2 CRITICAL - ${#cert_expired[*]} certificate(s) expired (${cert_expired[*]})|'total_certs'=${#cert_names[*]};;;; expired_certs'=${#cert_expired[*]};;;; warning_certs'=${#cert_warning[*]};;;;"
+  echo "CHECK_RANCHER2 CRITICAL - ${#cert_expired[*]} certificate(s) expired (${cert_expired[*]}) ${ignoreoutput}|'total_certs'=${#cert_names[*]};;;; 'expired_certs'=${#cert_expired[*]};;;; 'warning_certs'=${#cert_warning[*]};;;; 'ignored_certs'=${#cert_ignored[*]};;;;"
   exit ${STATE_CRITICAL}
 elif [[ ${#cert_warning[*]} -gt 0 ]]; then
-  echo "CHECK_RANCHER2 WANRING - ${#cert_warning[*]} certificate(s) will expire soon (${cert_warning[*]})|'total_certs'=${#cert_names[*]};;;; expired_certs'=${#cert_expired[*]};;;; warning_certs'=${#cert_warning[*]};;;;"
+  echo "CHECK_RANCHER2 WANRING - ${#cert_warning[*]} certificate(s) will expire soon (${cert_warning[*]}) ${ignoreoutput}|'total_certs'=${#cert_names[*]};;;; 'expired_certs'=${#cert_expired[*]};;;; 'warning_certs'=${#cert_warning[*]};;;; 'ignored_certs'=${#cert_ignored[*]};;;;"
   exit ${STATE_WARNING}
 else
-  echo "CHECK_RANCHER2 OK - All ${#cert_names[*]} certificates are valid|'total_certs'=${#cert_names[*]};;;; expired_certs'=${#cert_expired[*]};;;; warning_certs'=${#cert_warning[*]};;;;"
+  echo "CHECK_RANCHER2 OK - All ${#cert_names[*]} certificates are valid ${ignoreoutput}|'total_certs'=${#cert_names[*]};;;; 'expired_certs'=${#cert_expired[*]};;;; 'warning_certs'=${#cert_warning[*]};;;; 'ignored_certs'=${#cert_ignored[*]};;;;"
   exit ${STATE_OK}
 fi
 
