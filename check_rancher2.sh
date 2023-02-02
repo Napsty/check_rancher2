@@ -5,8 +5,8 @@
 # Official repo: https://github.com/Napsty/check_rancher2                                #
 # Documentation: https://www.claudiokuenzler.com/monitoring-plugins/check_rancher2.php   #
 # Purpose:       Monitor Rancher 2.x Kubernetes cluster and their containers             #
-# Description:   Checks status of resources within the Kubernetes cluster(s) using       #
-#                Rancher 2.x API                                                         #
+# Description:   Checks status of resources within the Rancher managed Kubernetes        #
+#                cluster(s) using Rancher 2.x API                                        #
 #                                                                                        #
 # License :      GNU General Public Licence (GPL) http://www.gnu.org/                    #
 # This program is free software; you can redistribute it and/or modify it under the      #
@@ -52,6 +52,7 @@
 # 20220909 1.10.0 Fix ComponentStatus (#35), show K8s version in single cluster check    #
 # 20220909 1.10.0 Allow ignoring statuses on workload checks (#29)                       #
 # 20230110 1.11.0 Allow ignoring workload names, provisioning cluster not critical (#39) #
+# 20230202 1.12.0 Add local-certs check type                                             #
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
@@ -60,7 +61,7 @@ STATE_CRITICAL=2        # define the exit code if status is Critical
 STATE_UNKNOWN=3         # define the exit code if status is Unknown
 export PATH=/usr/local/bin:/usr/bin:/bin:$PATH # Set path
 proto=http		# Protocol to use, default is http, can be overwritten with -S parameter
-version=1.11.0
+version=1.12.0
 ##########################################################################################
 # functions
 
@@ -150,8 +151,8 @@ function convertPods()
 # We all need help from time to time
 usage ()
 {
-printf "check_rancher2 v ${version} (c) 2018-2022 Claudio Kuenzler and contributers (published under GPLv2)
-Usage: $0 -H Rancher2Address -U user-token -P password [-S] -t checktype [-c cluster] [-p project] [-w workload]
+printf "check_rancher2 v ${version} (c) 2018-2023 Claudio Kuenzler and contributers (published under GPLv2)
+Usage: $0 -H Rancher2Address -U user-token -P password [-S] -t checktype [-c cluster] [-p project] [-n namespace] [-w workload] [-o pod]
 
 Options:
 \t[ -H | --apihost ] Address of Rancher 2 API (e.g. rancher.example.com)
@@ -165,13 +166,14 @@ Options:
 \t[ -n | --namespacename ] Namespace name (needed for specific workload or pod checks)
 \t[ -w | --workloadname ] Workload name (for specific workload check)
 \t[ -o | --podname ] Pod name (for specific pod check, this makes only sense if you use static pods)
-\t[ -i | --ignore ] Comma-separated list of status(es) to ignore (on node and workload check type) or list of workload name(s) to ignore (on workload check type)
-\t[ --cpu-warn ] Exit with WARNING status if more than PERCENT of cpu capacity is used (currently only supported in cluster specific node and cluster check type)
-\t[ --cpu-crit ] Exit with CRITICAL status if more than PERCENT of cpu capacity is used (currently only supported in cluster specific node and cluster check type)
-\t[ --memory-warn ] Exit with WARNING status if more than PERCENT of mem capacity is used (currently only supported in cluster specific node and cluster check type)
-\t[ --memory-crit ] Exit with CRITICAL status if more than PERCENT of mem capacity is used (currently only supported in cluster specific node and cluster check type)
-\t[ --pods-warn ] Exit with WARNING status if more than PERCENT of pod capacity is used (currently only supported in cluster specific node and cluster check type)
-\t[ --pods-crit ] Exit with CRITICAL status if more than PERCENT of pod capacity is used (currently only supported in cluster specific node and cluster check type)
+\t[ -i | --ignore ] Comma-separated list of status(es) to ignore (node and workload check types), list of workload name(s) to ignore (workload check type) or certificate to ignore (local-certs check type)
+\t[ --cpu-warn ] Exit with WARNING status if more than PERCENT of cpu capacity is used (supported check types: node, cluster)
+\t[ --cpu-crit ] Exit with CRITICAL status if more than PERCENT of cpu capacity is used (supported check types: node, cluster)
+\t[ --memory-warn ] Exit with WARNING status if more than PERCENT of mem capacity is used (supported check types: node, cluster)
+\t[ --memory-crit ] Exit with CRITICAL status if more than PERCENT of mem capacity is used (supported check types: node, cluster)
+\t[ --pods-warn ] Exit with WARNING status if more than PERCENT of pod capacity is used (supported check types: node, cluster)
+\t[ --pods-crit ] Exit with CRITICAL status if more than PERCENT of pod capacity is used (supported check types: node, cluster)
+\t[ --cert-warn ] Warning threshold in days to warn before a certificate expires (supported check types: local-certs)
 \t[ -h  | --help ] Help. I need somebody. Help. Not just anybody. Heeeeeelp!
 
 Check Types:
@@ -181,6 +183,7 @@ Check Types:
 \tproject -> Checks the current status of all projects or of a specific project (defined with -p projectid)
 \tworkload -> Checks the current status of all or a specific (-w workloadname) workload within a project (-p projectid must be set!)
 \tpod -> Checks the current status of all or a specific (-o podname -n namespace) pod within a project (-p projectid must be set!)
+\tlocal-certs -> Checks the current status of all internal Rancher certificates (e.g. rancher-webhook) in local cluster under the System project (namespace: cattle-system)
 "
 exit ${STATE_UNKNOWN}
 }
@@ -193,7 +196,7 @@ for cmd in jq curl; do
  fi
 done
 #########################################################################
-PARSED_ARGUMENTS=$(getopt -a -n check_rancher2 -o H:U:P:t:c:p:n:w:o:Ssi:h --long apihost:,apiuser:,apipass:,type:,clustername:,projectname:,namespacename:,workloadname:,podname:,secure,selfsigned,ignore:,cpu-warn:,cpu-crit:,memory-warn:,memory-crit:,pods-warn:,pods-crit: -- "$@")
+PARSED_ARGUMENTS=$(getopt -a -n check_rancher2 -o H:U:P:t:c:p:n:w:o:Ssi:h --long apihost:,apiuser:,apipass:,type:,clustername:,projectname:,namespacename:,workloadname:,podname:,secure,selfsigned,ignore:,cpu-warn:,cpu-crit:,memory-warn:,memory-crit:,pods-warn:,pods-crit:,cert-warn: -- "$@")
 VALID_ARGUMENTS=$?
 if [ "$VALID_ARGUMENTS" != "0" ]; then
   usage
@@ -221,6 +224,7 @@ while :; do
   --memory-crit)        memory_crit=${2}   ; shift 2 ;;
   --pods-warn)          pods_warn=${2}     ; shift 2 ;;
   --pods-crit)          pods_crit=${2}     ; shift 2 ;;
+  --cert-warn)          cert_warn=${2}     ; shift 2 ;;
   --)                   shift; break ;;
   -h | --help)          usage;;
   *)      echo "Unexpected option: $1 - this should not happen. Please consult --help for valid options."
@@ -1181,6 +1185,54 @@ else
   fi
 
 fi
+;;
+
+# --- local-certs --- #
+local-certs)
+rightnow=$(date +%s)
+if [[ ${cert_warn} -gt 0 ]]; then let warning=(${rightnow}+${cert_warn}*86400); fi
+projectid=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/cluster/local/projects" | jq -r '.data[] | select(.name == "System").id')
+
+api_out_certs=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/projects/${projectid}/namespacedcertificates?namespaceId=cattle-system")
+declare -a cert_names=( $(echo "$api_out_certs" | jq -r '.data[] | select(.type == "namespacedCertificate").name') )
+declare -a cert_expiry=( $(echo "$api_out_certs" | jq -r '.data[] | select(.type == "namespacedCertificate").expiresAt') )
+
+#echo ${cert_names[*]}     # Enable for debugging
+#echo ${cert_expiry[*]}    # Enable for debugging
+
+i=0
+for entry in ${cert_expiry[*]}; do
+  if [[ -n $(echo ${ignore} | grep -x ${cert_names[${i}]}) ]]; then
+    cert_ignored[${i}]="${cert_names[${i}]}"
+    continue
+  fi
+  expiry=$(date --date="${entry}" +%s)
+  if [[ ${rightnow} -gt ${expiry} ]]; then
+    let diff=(${rightnow}-${expiry})/86400
+    cert_expired[${i}]="${cert_names[${i}]} expired ${diff} days ago -"
+  elif [[ ${warning} -gt ${expiry} ]]; then
+    let diff=(${warning}-${expiry})/86400
+    echo "${cert_names[${i}]} will expire in ${diff} days -"
+    cert_warning[${i}]="${cert_names[${i}]} will expire in ${diff} days -"
+  fi
+  let i++
+done
+
+if [[ ${#cert_ignored[*]} -gt 0 ]]; then
+  ignoreoutput="- ${#cert_ignored[*]} certificate(s) ignored: ${cert_ignored[*]}"
+fi
+
+if [[ ${#cert_expired[*]} -gt 0 ]]; then
+  echo "CHECK_RANCHER2 CRITICAL - ${#cert_expired[*]} certificate(s) expired (${cert_expired[*]}) ${ignoreoutput}|'total_certs'=${#cert_names[*]};;;; 'expired_certs'=${#cert_expired[*]};;;; 'warning_certs'=${#cert_warning[*]};;;; 'ignored_certs'=${#cert_ignored[*]};;;;"
+  exit ${STATE_CRITICAL}
+elif [[ ${#cert_warning[*]} -gt 0 ]]; then
+  echo "CHECK_RANCHER2 WANRING - ${#cert_warning[*]} certificate(s) will expire soon (${cert_warning[*]}) ${ignoreoutput}|'total_certs'=${#cert_names[*]};;;; 'expired_certs'=${#cert_expired[*]};;;; 'warning_certs'=${#cert_warning[*]};;;; 'ignored_certs'=${#cert_ignored[*]};;;;"
+  exit ${STATE_WARNING}
+else
+  echo "CHECK_RANCHER2 OK - All ${#cert_names[*]} certificates are valid ${ignoreoutput}|'total_certs'=${#cert_names[*]};;;; 'expired_certs'=${#cert_expired[*]};;;; 'warning_certs'=${#cert_warning[*]};;;; 'ignored_certs'=${#cert_ignored[*]};;;;"
+  exit ${STATE_OK}
+fi
+
 ;;
 
 esac
