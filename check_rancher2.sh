@@ -53,6 +53,7 @@
 # 20220909 1.10.0 Allow ignoring statuses on workload checks (#29)                       #
 # 20230110 1.11.0 Allow ignoring workload names, provisioning cluster not critical (#39) #
 # 20230202 1.12.0 Add local-certs check type                                             #
+# 20231208 1.12.1 Use 'command -v' instead of 'which' for required command check         #
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
@@ -61,7 +62,7 @@ STATE_CRITICAL=2        # define the exit code if status is Critical
 STATE_UNKNOWN=3         # define the exit code if status is Unknown
 export PATH=/usr/local/bin:/usr/bin:/bin:$PATH # Set path
 proto=http		# Protocol to use, default is http, can be overwritten with -S parameter
-version=1.12.0
+version=1.12.1
 ##########################################################################################
 # functions
 
@@ -190,7 +191,7 @@ exit ${STATE_UNKNOWN}
 #########################################################################
 # Check for necessary commands
 for cmd in jq curl; do
- if ! `which ${cmd} 1>/dev/null`; then
+ if ! `command -v ${cmd} 1>/dev/null`; then
    echo "UNKNOWN: ${cmd} does not exist, please check if command exists and PATH is correct"
    exit ${STATE_UNKNOWN}
  fi
