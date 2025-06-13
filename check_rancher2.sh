@@ -18,7 +18,7 @@
 # You should have received a copy of the GNU General Public License along with this      #
 # program; if not, see <https://www.gnu.org/licenses/>.                                  #
 #                                                                                        #
-# Copyright 2018-2023 Claudio Kuenzler                                                   #
+# Copyright 2018-2023,2025 Claudio Kuenzler                                              #
 # Copyright 2020 Matthias Kneer                                                          #
 # Copyright 2021-2023 Steffen Eichler                                                    #
 # Copyright 2021 lopf                                                                    #
@@ -54,6 +54,7 @@
 # 20230110 1.11.0 Allow ignoring workload names, provisioning cluster not critical (#39) #
 # 20230202 1.12.0 Add local-certs check type                                             #
 # 20231208 1.12.1 Use 'command -v' instead of 'which' for required command check         #
+# 20250613 1.13.0 Add api-token check type, output fix in local-certs check, fix --help  #
 ##########################################################################################
 # (Pre-)Define some fixed variables
 STATE_OK=0              # define the exit code if status is OK
@@ -62,7 +63,7 @@ STATE_CRITICAL=2        # define the exit code if status is Critical
 STATE_UNKNOWN=3         # define the exit code if status is Unknown
 export PATH=/usr/local/bin:/usr/bin:/bin:$PATH # Set path
 proto=http		# Protocol to use, default is http, can be overwritten with -S parameter
-version=1.12.1
+version=1.13.0
 ##########################################################################################
 # functions
 
@@ -152,7 +153,7 @@ function convertPods()
 # We all need help from time to time
 usage ()
 {
-printf "check_rancher2 v ${version} (c) 2018-2023 Claudio Kuenzler and contributers (published under GPLv2)
+printf "check_rancher2 v ${version} (c) 2018-2025 Claudio Kuenzler and contributers (published under GPLv2)
 Usage: $0 -H Rancher2Address -U user-token -P password [-S] -t checktype [-c cluster] [-p project] [-n namespace] [-w workload] [-o pod]
 
 Options:
@@ -174,7 +175,8 @@ Options:
 \t[ --memory-crit ] Exit with CRITICAL status if more than PERCENT of mem capacity is used (supported check types: node, cluster)
 \t[ --pods-warn ] Exit with WARNING status if more than PERCENT of pod capacity is used (supported check types: node, cluster)
 \t[ --pods-crit ] Exit with CRITICAL status if more than PERCENT of pod capacity is used (supported check types: node, cluster)
-\t[ --cert-warn ] Warning threshold in days to warn before a certificate expires (supported check types: local-certs)
+\t[ --cert-warn ] DEPRECATED, use --expiry-warn
+\t[ --expiry-warn ] Warning threshold in days to warn before a local certificate or API token expires (supported check types: local-certs, api-token)
 \t[ -h  | --help ] Help. I need somebody. Help. Not just anybody. Heeeeeelp!
 
 Check Types:
@@ -185,6 +187,7 @@ Check Types:
 \tworkload -> Checks the current status of all or a specific (-w workloadname) workload within a project (-p projectid must be set!)
 \tpod -> Checks the current status of all or a specific (-o podname -n namespace) pod within a project (-p projectid must be set!)
 \tlocal-certs -> Checks the current status of all internal Rancher certificates (e.g. rancher-webhook) in local cluster under the System project (namespace: cattle-system)
+\tapi-token -> Checks the expiry of the API token used for this plugin
 "
 exit ${STATE_UNKNOWN}
 }
@@ -197,7 +200,7 @@ for cmd in jq curl; do
  fi
 done
 #########################################################################
-PARSED_ARGUMENTS=$(getopt -a -n check_rancher2 -o H:U:P:t:c:p:n:w:o:Ssi:h --long apihost:,apiuser:,apipass:,type:,clustername:,projectname:,namespacename:,workloadname:,podname:,secure,selfsigned,ignore:,cpu-warn:,cpu-crit:,memory-warn:,memory-crit:,pods-warn:,pods-crit:,cert-warn: -- "$@")
+PARSED_ARGUMENTS=$(getopt -a -n check_rancher2 -o H:U:P:t:c:p:n:w:o:Ssi:h --long apihost:,apiuser:,apipass:,type:,clustername:,projectname:,namespacename:,workloadname:,podname:,secure,selfsigned,ignore:,cpu-warn:,cpu-crit:,memory-warn:,memory-crit:,pods-warn:,pods-crit:,cert-warn:,expiry-warn:,help -- "$@")
 VALID_ARGUMENTS=$?
 if [ "$VALID_ARGUMENTS" != "0" ]; then
   usage
@@ -225,7 +228,8 @@ while :; do
   --memory-crit)        memory_crit=${2}   ; shift 2 ;;
   --pods-warn)          pods_warn=${2}     ; shift 2 ;;
   --pods-crit)          pods_crit=${2}     ; shift 2 ;;
-  --cert-warn)          cert_warn=${2}     ; shift 2 ;;
+  --cert-warn)          expiry_warn=${2}   ; shift 2 ;;
+  --expiry-warn)        expiry_warn=${2}   ; shift 2 ;;
   --)                   shift; break ;;
   -h | --help)          usage;;
   *)      echo "Unexpected option: $1 - this should not happen. Please consult --help for valid options."
@@ -1191,7 +1195,7 @@ fi
 # --- local-certs --- #
 local-certs)
 rightnow=$(date +%s)
-if [[ ${cert_warn} -gt 0 ]]; then let warning=(${rightnow}+${cert_warn}*86400); fi
+if [[ ${expiry_warn} -gt 0 ]]; then let warning=(${rightnow}+${expiry_warn}*86400); fi
 projectid=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/cluster/local/projects" | jq -r '.data[] | select(.name == "System").id')
 
 api_out_certs=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/projects/${projectid}/namespacedcertificates?namespaceId=cattle-system")
@@ -1213,7 +1217,7 @@ for entry in ${cert_expiry[*]}; do
     cert_expired[${i}]="${cert_names[${i}]} expired ${diff} days ago -"
   elif [[ ${warning} -gt ${expiry} ]]; then
     let diff=(${warning}-${expiry})/86400
-    echo "${cert_names[${i}]} will expire in ${diff} days -"
+    #echo "${cert_names[${i}]} will expire in ${diff} days -"	# Enable for debugging
     cert_warning[${i}]="${cert_names[${i}]} will expire in ${diff} days -"
   fi
   let i++
@@ -1234,6 +1238,40 @@ else
   exit ${STATE_OK}
 fi
 
+;;
+
+# --- api-token --- #
+api-token)
+rightnow=$(date +%s)
+if [[ ${expiry_warn} -gt 0 ]]; then let warning=(${rightnow}+${expiry_warn}*86400); fi
+api_out_token=$(curl -s ${selfsigned} -u "${apiuser}:${apipass}" "${proto}://${apihost}/v3/tokens/${apiuser}")
+description=$(echo "$api_out_token" | jq -r '.description')
+expired=$(echo "$api_out_token" | jq -r '.expired')
+expiredate=$(echo "$api_out_token" | jq -r '.expiresAt')
+
+if [[ -n ${description} ]]; then token_description="(${description}) "; fi
+
+# Check for expired token (usually this should never show up b/c access to Rancher API is already revoked)
+if [[ ${expired} == true ]]; then
+  echo "CHECK_RANCHER2 CRITICAL - API Token for Rancher monitoring has expired"
+  exit ${STATE_CRITICAL}
+fi
+
+if [[ -n ${expiredate} && ${expiredate} != "" ]]; then
+  # Check expiry
+  token_expiry=$(date --date="${expiredate}" +%s)
+  let diff=(${token_expiry}-${rightnow})/86400
+  if [[ ${warning} -gt ${token_expiry} ]]; then
+    echo "CHECK_RANCHER2 WARNING - API Token ${token_description}will expire in ${diff} days"
+    exit ${STATE_WARNING}
+  else
+    echo "CHECK_RANCHER2 OK - API Token ${token_description}still valid (will expire in ${diff} days)"
+    exit ${STATE_OK}
+  fi
+else
+  echo "CHECK_RANCHER2 OK - API Token ${token_description}does not expire"
+  exit ${STATE_OK}
+fi
 ;;
 
 esac
