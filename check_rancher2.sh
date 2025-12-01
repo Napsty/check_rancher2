@@ -1216,8 +1216,8 @@ for entry in ${cert_expiry[*]}; do
     let diff=(${rightnow}-${expiry})/86400
     cert_expired[${i}]="${cert_names[${i}]} expired ${diff} days ago -"
   elif [[ ${warning} -gt ${expiry} ]]; then
-    let diff=(${warning}-${expiry})/86400
-    #echo "${cert_names[${i}]} will expire in ${diff} days -"	# Enable for debugging
+    let diff=(${expiry}-${rightnow})/86400
+    #echo "${cert_names[${i}]} will expire in ${diff} days -"   # Enable for debugging
     cert_warning[${i}]="${cert_names[${i}]} will expire in ${diff} days -"
   fi
   let i++
